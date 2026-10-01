@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets / tokens (never commit)
+.env
+.induslms_token.json
+.indus_outlook_token.json
+*token*.json
+
+# Downloads / local data
+downloads/
+*.docx
+*.pdf
+!requirements*.txt
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

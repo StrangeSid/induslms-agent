@@ -1,0 +1,21 @@
+[project]
+name = "induslms-agent"
+version = "0.1.0"
+description = "Read-only agent access to Indus LMS academics: announcements, assignments, shared resources, attendance"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+  "requests>=2.31",
+  "mcp>=1.0,<2",
+]
+
+[project.scripts]
+induslms = "lms:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["lms", "server"]
