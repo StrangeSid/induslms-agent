@@ -16,7 +16,7 @@ Read-only — never submit, mark-read, send, or mutate. Cite source per item.
 ## Sources
 
 1. **MCP tools** (`induslms-academics`) — live data, preferred.
-2. **CLI fallback** — `lms.py` (LMS), `outlook.py` (email) in repo root.
+2. **CLI fallback** — `lms.py` (LMS), `mailapp.py` (School mail), `outlook.py` (Graph email).
 
 ## LMS workflow
 
@@ -27,7 +27,8 @@ Read-only — never submit, mark-read, send, or mutate. Cite source per item.
 
 ## Email workflow
 
-* `outlook_search [query] [--sender] [--since ISO]`, `outlook_read <id>`, `outlook_folders`. Needs `INDUS_OUTLOOK_CLIENT_ID` + one `outlook.py login`.
+* Prefer Apple Mail.app tools — zero setup: `schoolmail_search [query] [--sender] [--since ISO]`, `schoolmail_read <Mailbox:id>`, `schoolmail_folders`. Account `School`, newest first.
+* Graph tools (`outlook_search/read/folders`) = fallback. Need `INDUS_OUTLOOK_CLIENT_ID` + one `outlook.py login`.
 * Match teacher emails ↔ `teacher_name/email` from `list_courses`; assignment titles ↔ subjects; inbox notices ↔ announcements.
 
 ## Output

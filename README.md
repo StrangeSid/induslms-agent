@@ -33,7 +33,20 @@ Stdio, read-only tools only (no login, no mark-read, no submissions):
 python3 server.py
 ```
 
-Tools: `get_profile`, `list_courses`, `list_resources`, `get_resource`, `download_resource`, `assignments_overview`, `list_eol`, `list_assessments`, `list_notifications`, `get_attendance`, `get_attendance_day`, `list_announcements`, `list_calendar`.
+Tools: `get_profile`, `list_courses`, `list_resources`, `get_resource`, `download_resource`, `assignments_overview`, `list_eol`, `list_assessments`, `list_notifications`, `get_attendance`, `get_attendance_day`, `list_announcements`, `list_calendar`, `schoolmail_search`, `schoolmail_read`, `schoolmail_folders`, `outlook_search`, `outlook_read`, `outlook_folders`.
+
+## School email (Apple Mail.app — no setup)
+
+Mail.app already holds the `School` account, so agents read it via osascript (JXA). No credentials, no app registration:
+
+```bash
+python3 mailapp.py folders
+python3 mailapp.py search "assignment" --top 5
+python3 mailapp.py search --sender teacher@indusschool.com --since 2026-09-01
+python3 mailapp.py read Inbox:24203
+```
+
+Refs are `Mailbox:id`. Override account/mailbox with `SCHOOL_MAIL_ACCOUNT` / `SCHOOL_MAILBOX`.
 
 ### Register in pi
 

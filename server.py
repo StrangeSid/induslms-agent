@@ -14,6 +14,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 import lms
+import mailapp
 
 mcp = FastMCP("induslms-academics")
 
@@ -171,6 +172,30 @@ def outlook_read(message_id: str, max_body: int = 4000) -> dict[str, Any]:
 def outlook_folders() -> dict[str, Any]:
     """Outlook mail folders with unread/total counts."""
     return _outlook().list_folders()
+
+
+@mcp.tool()
+def schoolmail_search(
+    query: str | None = None,
+    sender: str | None = None,
+    since: str | None = None,
+    top: int = 10,
+    mailbox: str = "Inbox",
+) -> dict[str, Any]:
+    """Search School inbox in Apple Mail.app (no setup; newest first). since = ISO date."""
+    return mailapp.search_inbox(query, sender, since, top, mailbox)
+
+
+@mcp.tool()
+def schoolmail_read(ref: str, max_body: int = 4000) -> dict[str, Any]:
+    """Read one School email by ref 'Mailbox:id' (subject, from, date, body)."""
+    return mailapp.read_message(ref, max_body)
+
+
+@mcp.tool()
+def schoolmail_folders() -> dict[str, Any]:
+    """School account mailboxes with message counts."""
+    return mailapp.list_folders()
 
 
 def main() -> None:

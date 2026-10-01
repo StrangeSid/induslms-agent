@@ -46,7 +46,8 @@ def test_mcp_tools_registered():
     for expected in ("assignments_overview", "list_resources",
                      "download_resource", "list_notifications",
                      "get_attendance", "list_announcements",
-                     "outlook_search", "outlook_read", "outlook_folders"):
+                     "outlook_search", "outlook_read", "outlook_folders",
+                     "schoolmail_search", "schoolmail_read", "schoolmail_folders"):
         assert expected in tools, f"missing MCP tool: {expected}"
 
 
@@ -67,3 +68,16 @@ def test_outlook_helpers_no_network():
 
     text = outlook.summarize_messages({"count": 0, "results": []})
     assert "messages: 0" in text
+
+
+def test_mailapp_parse_noosascript():
+    import mailapp
+
+    rows = [{"id": 7, "subject": "HW", "sender": "T <t@indusschool.com>",
+             "date": "2026-09-01T00:00:00Z", "content": "do x" * 100, "isRead": False}]
+    recs = mailapp.parse_search_output(rows, "Inbox")
+    assert recs[0]["ref"] == "Inbox:7"
+    assert recs[0]["from"] == "T <t@indusschool.com>"
+    assert recs[0]["is_read"] is False
+    assert len(recs[0]["preview"]) == 200
+    assert "UNREAD" in mailapp.summarize_messages({"count": 1, "results": recs})
