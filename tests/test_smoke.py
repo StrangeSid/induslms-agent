@@ -1,6 +1,7 @@
 """Smoke tests: imports + read-only helpers (no network, no token)."""
 
 import importlib
+import os
 
 
 def test_imports():
@@ -44,5 +45,25 @@ def test_mcp_tools_registered():
     tools = asyncio.run(names())
     for expected in ("assignments_overview", "list_resources",
                      "download_resource", "list_notifications",
-                     "get_attendance", "list_announcements"):
+                     "get_attendance", "list_announcements",
+                     "outlook_search", "outlook_read", "outlook_folders"):
         assert expected in tools, f"missing MCP tool: {expected}"
+
+
+def test_outlook_helpers_no_network():
+    import outlook
+
+    # cache outside repo
+    assert outlook.TOKEN_CACHE.startswith(os.path.expanduser("~"))
+    assert "induslms-agent" not in outlook.TOKEN_CACHE
+    # least privilege
+    assert outlook.SCOPES == ["Mail.Read"]
+
+    path, params = outlook.build_search_params("homework", "t@indusschool.com", "2026-09-01", 5)
+    assert path == "/me/mailFolders/inbox/messages"
+    assert params["$search"] == '"homework" from:t@indusschool.com'
+    assert params["$filter"] == "receivedDateTime ge 2026-09-01"
+    assert params["$top"] == 5
+
+    text = outlook.summarize_messages({"count": 0, "results": []})
+    assert "messages: 0" in text

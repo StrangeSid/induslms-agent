@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """IndusLMS MCP server (stdio, read-only).
 
-Exposes agent-safe tools for announcements, assignments, shared resources,
-notifications, and attendance. No login, no mark-read, no submissions —
-authentication comes from the existing token file created via `lms.py login`
-(never committed; see README).
+Academic tools (LMS) + school Outlook inbox tools (Graph). No login,
+no mark-read, no send, no submissions — auth comes from token files created
+via `lms.py login` / `outlook.py login` (never committed; see README).
 """
 
 from __future__ import annotations
@@ -138,6 +137,40 @@ def list_calendar() -> dict[str, Any]:
     """School calendar events."""
     token, _ = _ctx()
     return lms.calendar_events(token)
+
+
+def _outlook():
+    import outlook  # deferred: msal only needed for email tools
+
+    if not os.environ.get(outlook.CLIENT_ID_ENV):
+        raise RuntimeError(
+            f"Outlook not configured. Set {outlook.CLIENT_ID_ENV}, "
+            "then run `python3 outlook.py login`. See README."
+        )
+    return outlook
+
+
+@mcp.tool()
+def outlook_search(
+    query: str | None = None,
+    sender: str | None = None,
+    since: str | None = None,
+    top: int = 10,
+) -> dict[str, Any]:
+    """Search school Outlook inbox (teacher emails, assignment notices). since = ISO date."""
+    return _outlook().search_inbox(query, sender, since, top)
+
+
+@mcp.tool()
+def outlook_read(message_id: str, max_body: int = 4000) -> dict[str, Any]:
+    """Read one Outlook message (subject, from, date, truncated body)."""
+    return _outlook().read_message(message_id, max_body)
+
+
+@mcp.tool()
+def outlook_folders() -> dict[str, Any]:
+    """Outlook mail folders with unread/total counts."""
+    return _outlook().list_folders()
 
 
 def main() -> None:

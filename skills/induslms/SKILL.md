@@ -1,49 +1,35 @@
 ---
 name: induslms-academics
 description: >-
-  Read-only access to Indus LMS academics: announcements, assignments
-  (EOL tests + FA/SDL assessments), shared teacher resources (list, open
-  folders, download files), notifications, and attendance. Use whenever the
-  user asks about schoolwork, homework, what teachers shared, what's due,
-  test scores, notices, or attendance. Prefers MCP tools when available,
-  falls back to the induslms CLI.
+  Read-only Indus LMS academics plus school Outlook inbox: announcements,
+  assignments (EOL tests + FA/SDL assessments), shared teacher resources
+  (list, open folders, download files), notifications, attendance, and
+  teacher emails. Use for schoolwork, homework, what's due, test scores,
+  notices, attendance, or teacher emails. Prefers MCP tools, falls back
+  to repo CLIs.
 ---
 
-# Indus LMS Academics
+# Indus Academics
 
-Give the student their academic context from Indus LMS. Read-only — never attempt to submit, mark-read, or mutate anything.
+Read-only — never submit, mark-read, send, or mutate. Cite source per item.
 
-## Data sources (priority order)
+## Sources
 
-1. **MCP tools** (`induslms-academics` server) — live data, preferred.
-2. **CLI fallback** — `python3 /path/to/induslms-agent/lms.py ...` (same functions).
+1. **MCP tools** (`induslms-academics`) — live data, preferred.
+2. **CLI fallback** — `lms.py` (LMS), `outlook.py` (email) in repo root.
 
-## Workflow
+## LMS workflow
 
-### 1. Announcements first
-* `list_announcements` (or `lms.py announcements`). School-wide notices.
-* Then `list_notifications --unread-only` for personal items (EOL published, resources shared). Notification `link` fields route into the LMS (`/assignments/test/.../eol`, `/courses/.../resources/...`).
+1. **Notices**: `list_announcements`, then `list_notifications --unread-only`. `link` routes into LMS (`/assignments/test/.../eol`, `/courses/.../resources/...`).
+2. **Assignments**: `assignments_overview [course_id]` merges EOL tests (status/score/`expires_message`), assessments (`due_date`, nested under `assessment`), resources. Report all three. `test-marks/me` PYP-only — DP returns `BAD_REQUEST`, use EOL + assessments. IDs from `list_courses`.
+3. **Resources**: `list_resources(course_id)` → usually folders (`is_folder`, `child_count`). Open via `parent_resource_id` (`children <id>`); `?parent=` unfiltered, avoid. `get_resource` → `file_urls[]` (`file_id`, `name`). `download_resource` saves to `~/Downloads/induslms`; read file after when asked about contents. Shapes: `references/endpoints.md`.
+4. **Attendance**: `get_attendance` (sessions) + `get_attendance_day` (days + `reason`).
 
-### 2. Assignments (what's due / scores)
-* `assignments_overview [course_id]` merges three sources — always report all three:
-  * **EOL tests**: teacher-published, have `status` (assigned/submitted/graded), `score/total_marks`, `expires_message` (due).
-  * **Assessments**: FA/SDL tasks, `due_date`, `teacher_name`, nested under `assessment`.
-  * **Shared resources**: teacher materials for the course.
-* `test-marks/me` is PYP-only — on DP accounts it returns `BAD_REQUEST`. Say so and use EOL + assessments instead.
-* Course IDs come from `list_courses` (DP 2026-27; e.g. CS01 `bdbc1c79-...`, teacher names included).
+## Email workflow
 
-### 3. Shared resources (files from teachers)
-* `list_resources(course_id)` → top level is usually **folders** (`is_folder`, `child_count`).
-* Open folders with `parent_resource_id` (`list_resources` / `children <folder_id>`). Do NOT use `?parent=` — it returns unfiltered results.
-* `get_resource(id)` shows `file_urls[]` with `file_id` + `name`.
-* `download_resource(resource_id, file_id)` saves to `~/Downloads/induslms` and returns the path. Read the file after downloading when the user asks about its contents.
-* See `references/endpoints.md` for exact URL shapes.
+* `outlook_search [query] [--sender] [--since ISO]`, `outlook_read <id>`, `outlook_folders`. Needs `INDUS_OUTLOOK_CLIENT_ID` + one `outlook.py login`.
+* Match teacher emails ↔ `teacher_name/email` from `list_courses`; assignment titles ↔ subjects; inbox notices ↔ announcements.
 
-### 4. Attendance cross-check
-* `get_attendance` = session summary (present/total, percentage). `get_attendance_day` = day breakdown with `reason` (e.g. ISL Camp). Report both when asked about attendance.
+## Output
 
-## Output rules
-* Cite source per item (EOL / assessment / resource / announcement / notification).
-* Include due dates, status, and teacher names where available.
-* `--json` (CLI) / raw tool payloads when another agent consumes the output; human summaries otherwise.
-* If the MCP server reports "No LMS token", tell the user to run `python3 lms.py login <email>` once.
+Due dates, status, teacher names always. `--json`/raw payloads for agents, summaries for humans. "No token" error → `lms.py login <email>` once; Outlook unconfigured → point at README.

@@ -84,6 +84,21 @@ This copies the skill into the pi and opencode skill dirs. See the SKILL.md for 
 * Read-only by design. The only POSTs in the codebase are `login` and the (CLI-unused) token-refresh helper — the MCP server exposes neither.
 * Credentials via env/prompt only; tokens outside the repo; `.gitignore` blocks `*token*.json`, `.env`, downloads.
 
-## Outlook (deferred)
+## Outlook (school inbox via Microsoft Graph)
 
-School Outlook inbox via Microsoft Graph (device-code, `Mail.Read`) is planned as Phase D. Not in v0.1.0.
+Read-only (`Mail.Read` delegated, device-code flow). Token cache at
+`~/.indus_outlook_token.json` — never in repo.
+
+```bash
+# 1. Entra ID -> App registrations -> New: allow public client flows,
+#    add delegated Mail.Read. Multitenant OK.
+export INDUS_OUTLOOK_CLIENT_ID=<app/client id>
+python3 outlook.py login        # approve code in browser
+python3 outlook.py search "assignment" --top 5
+python3 outlook.py search --sender teacher@indusschool.com --since 2026-09-01
+python3 outlook.py read <message_id>
+```
+
+MCP tools: `outlook_search`, `outlook_read`, `outlook_folders`
+(same coverage; unconfigured → clear error, not crash).
+School tenant blocks user consent → IT admin must grant admin consent first.
