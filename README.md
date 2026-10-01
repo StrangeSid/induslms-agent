@@ -50,38 +50,45 @@ Refs are `Mailbox:id`. Override account/mailbox with `SCHOOL_MAIL_ACCOUNT` / `SC
 
 ### Register in pi
 
-Add to your pi MCP config (`~/.pi/` agent config or project `mcp.json` — see `mcp.json` in this repo for the exact block):
+Create `~/.pi/agent/mcp.json` (same shape as `mcp.json` in this repo):
 
 ```json
 { "mcpServers": { "induslms-academics": {
-  "command": "python",
-  "args": ["/path/to/induslms-agent/server.py"]
+  "command": "/path/to/induslms-agent/.venv/bin/python",
+  "args": ["/path/to/induslms-agent/server.py"],
+  "cwd": "/path/to/induslms-agent"
 } } }
 ```
 
+Use the venv python — system python lacks `mcp`/`msal`. Restart pi afterwards.
+
 ### Register in opencode
 
-Add to `~/.config/opencode/opencode.jsonc` under `mcp`:
+In `~/.config/opencode/opencode.jsonc` under `mcp`:
 
 ```json
 "induslms-academics": {
   "type": "local",
-  "command": ["python", "/path/to/induslms-agent/server.py"],
-  "enabled": true
+  "command": ["/path/to/induslms-agent/.venv/bin/python", "/path/to/induslms-agent/server.py"],
+  "cwd": "/path/to/induslms-agent",
+  "enabled": true,
+  "timeout": 15000
 }
 ```
 
-(Adjust to your opencode version's local-stdio syntax; `mcp.json` here is the canonical reference.)
+Restart opencode afterwards. Verify with a prompt like
+"list my courses using induslms-academics".
 
 ## Skill (workflow guidance)
 
-`skills/induslms/SKILL.md` teaches agents the academic workflow: announcements → assignments → resources/download → attendance cross-check. Install:
+`skills/induslms-academics/SKILL.md` teaches the workflow:
+announcements → assignments → resources/download → attendance,
+plus School inbox. Install (copies to pi `~/.pi/agent/skills/`
+and opencode `~/.config/opencode/skills/`):
 
 ```bash
 bash scripts/install-skill.sh
 ```
-
-This copies the skill into the pi and opencode skill dirs. See the SKILL.md for details.
 
 ## Key API notes (reverse-engineered, verified live)
 
