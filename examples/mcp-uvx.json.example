@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "induslms-academics": {
+      "command": "uvx",
+      "args": ["induslms-agent", "server"],
+      "env": {
+        "INDUSLMS_TENANT": "${INDUSLMS_TENANT}"
+      },
+      "description": "Read-only Indus LMS academics + school inbox (requires: pip install induslms-agent or uvx)"
+    }
+  }
+}

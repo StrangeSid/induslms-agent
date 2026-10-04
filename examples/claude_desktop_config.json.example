@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "induslms-academics": {
+      "command": "/path/to/induslms-agent/.venv/bin/python",
+      "args": ["/path/to/induslms-agent/server.py"],
+      "env": {
+        "INDUSLMS_TENANT": "",
+        "INDUS_OUTLOOK_CLIENT_ID": ""
+      }
+    }
+  }
+}

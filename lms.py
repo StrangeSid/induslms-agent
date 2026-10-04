@@ -11,8 +11,15 @@ import sys
 import os
 from typing import Optional, Dict, Any
 
+try:
+    from dotenv import load_dotenv as _load_dotenv
+
+    _load_dotenv()
+except Exception:
+    pass
+
 API_BASE = "https://api.induslms.com"
-TOKEN_FILE = os.path.expanduser("~/.induslms_token.json")
+TOKEN_FILE = os.path.expanduser(os.environ.get("INDUSLMS_TOKEN_FILE", "~/.induslms_token.json"))
 
 HEADERS_BASE = {
     "Content-Type": "application/json",
@@ -442,6 +449,67 @@ def pp(data):
     print(json.dumps(data, indent=2, default=str))
 
 
+def doctor() -> dict:
+    """Check install health: deps, token, tenant, platform extras. Never raises."""
+    import shutil
+    import platform
+
+    result: dict = {
+        "ok": True,
+        "python": sys.version.split()[0],
+        "platform": platform.system(),
+        "token_file": TOKEN_FILE,
+        "checks": {},
+    }
+    checks = result["checks"]
+
+    try:
+        import mcp  # noqa: F401
+
+        checks["mcp"] = "ok"
+    except Exception as e:
+        checks["mcp"] = f"missing: {e}"
+        result["ok"] = False
+
+    try:
+        import msal  # noqa: F401
+
+        checks["msal"] = "ok"
+    except Exception as e:
+        checks["msal"] = f"missing: {e}"
+
+    token_data = load_token()
+    if not token_data or not token_data.get("access"):
+        checks["lms_token"] = f"missing (run: python3 lms.py login <email>; file={TOKEN_FILE})"
+        result["ok"] = False
+    else:
+        checks["lms_token"] = "ok"
+        try:
+            data = me(token_data["access"])
+            if isinstance(data, dict) and (data.get("email") or data.get("id")):
+                checks["lms_api"] = "ok"
+            else:
+                checks["lms_api"] = f"warn: unexpected profile response {str(data)[:120]}"
+        except Exception as e:
+            checks["lms_api"] = f"fail: {e}"
+            result["ok"] = False
+        roles = (token_data.get("user") or {}).get("roles") or []
+        tenant = roles[0].get("tenant_id") if roles else os.environ.get("INDUSLMS_TENANT")
+        checks["tenant"] = "ok" if tenant else "missing (set INDUSLMS_TENANT or re-login)"
+
+    if not os.environ.get("INDUS_OUTLOOK_CLIENT_ID"):
+        checks["outlook"] = "unconfigured (outlook_* disabled; set INDUS_OUTLOOK_CLIENT_ID + run outlook.py login)"
+    else:
+        checks["outlook"] = "configured"
+
+    if shutil.which("osascript") is None:
+        checks["schoolmail"] = "unavailable (macOS Mail.app only; schoolmail_* disabled on this platform)"
+    else:
+        checks["schoolmail"] = "ok"
+
+    return result
+
+
 def _parse_flags(raw_args):
     """Split CLI args into positionals and --flag values. Supports:
     --json, --unread-only, --inline, --course X, --parent X, --page N,
@@ -474,6 +542,7 @@ IndusLMS Agent CLI (read-only except login)
 
 Core:
   login <email> <password>                Login and save token
+  doctor                                   Check install health (deps, token, tenant, extras)
   me                                       Show my profile
   profile                                  Show detailed profile
   courses [tenant_id] [year]               My courses
@@ -506,14 +575,30 @@ Shared resources:
   reports <tenant_id> [student_id]         Progress report PDFs
   get <path>                               Raw GET to any API path
 
-Environment:
-  INDUSLMS_EMAIL    email
-  INDUSLMS_PASS     password
-  INDUSLMS_TENANT   tenant ID
+Environment (.env supported via python-dotenv):
+  INDUSLMS_EMAIL       email
+  INDUSLMS_PASS        password
+  INDUSLMS_TENANT      tenant ID
+  INDUSLMS_TOKEN_FILE  token path (default ~/.induslms_token.json)
 """)
         return
 
     cmd = args[0]
+    if cmd in ("doctor", "status", "check"):
+        _, flags = _parse_flags(args[1:])
+        result = doctor()
+        if flags.get("json"):
+            pp(result)
+        else:
+            print("induslms doctor: " + ("OK" if result["ok"] else "ISSUES FOUND"))
+            print(f"  python={result['python']} platform={result['platform']}")
+            print(f"  token_file={result['token_file']}")
+            for k, v in result["checks"].items():
+                print(f"  {k}: {v}")
+            if not result["ok"]:
+                print("\nFix: python3 lms.py login <email> (see README Quickstart)")
+        return
+
     token_data = load_token()
     token = token_data.get("access") if token_data else None
     tenant_id = token_data.get("user", {}).get("roles", [{}])[0].get("tenant_id") if token_data else None

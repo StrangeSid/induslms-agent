@@ -30,6 +30,14 @@ TIMEOUT = 120
 
 def _run_js(js: str) -> Any:
     """Run JXA via osascript, return parsed JSON stdout."""
+    import shutil
+    import sys as _sys
+
+    if _sys.platform != "darwin" or shutil.which("osascript") is None:
+        raise RuntimeError(
+            "schoolmail_* requires macOS Mail.app + osascript "
+            "(unavailable on this platform; use outlook_* instead)"
+        )
     r = subprocess.run(
         ["osascript", "-l", "JavaScript", "-e", js],
         capture_output=True, text=True, timeout=TIMEOUT,

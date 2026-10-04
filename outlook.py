@@ -28,13 +28,21 @@ from typing import Any, Optional
 import msal
 import requests
 
+try:
+    from dotenv import load_dotenv as _load_dotenv
+
+    _load_dotenv()
+except Exception:
+    pass
+
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 SCOPES = ["Mail.Read"]
 
 CLIENT_ID_ENV = "INDUS_OUTLOOK_CLIENT_ID"
 AUTHORITY_ENV = "INDUS_OUTLOOK_AUTHORITY"
+TOKEN_CACHE_ENV = "INDUS_OUTLOOK_TOKEN_FILE"
 DEFAULT_AUTHORITY = "https://login.microsoftonline.com/common"
-TOKEN_CACHE = os.path.expanduser("~/.indus_outlook_token.json")
+TOKEN_CACHE = os.path.expanduser(os.environ.get(TOKEN_CACHE_ENV, "~/.indus_outlook_token.json"))
 
 
 def _load_cache() -> msal.SerializableTokenCache:

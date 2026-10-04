@@ -1,0 +1,14 @@
+{
+  // Copy into ~/.config/opencode/opencode.jsonc under "mcp" (v1),
+  // or "mcp.servers" for v2. Replace /path/to paths.
+  "mcp": {
+    "induslms-academics": {
+      "type": "local",
+      "command": ["/path/to/induslms-agent/.venv/bin/python", "/path/to/induslms-agent/server.py"],
+      "cwd": "/path/to/induslms-agent",
+      "environment": { "INDUSLMS_TENANT": "{env:INDUSLMS_TENANT}" },
+      "enabled": true,
+      "timeout": 15000
+    }
+  }
+}

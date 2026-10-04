@@ -1,8 +1,20 @@
 # IndusLMS Agent
 
-Read-only agent access to Indus LMS academics: **announcements, assignments, shared resources, notifications, attendance**. For `pi` + `opencode` harnesses via **MCP + Skill + CLI** (Outlook deferred to a later phase).
+Read-only agent access to Indus LMS academics: **announcements, assignments, shared resources, notifications, attendance**. For `pi` + `opencode` harnesses via **MCP + Skill + CLI**.
 
-## Quickstart
+## Quickstart (one command)
+
+```bash
+git clone https://github.com/StrangeSid/induslms-agent.git
+cd induslms-agent
+./install.sh
+```
+
+This creates `.venv`, installs the package, runs `lms.py login`,
+merges MCP configs for pi + opencode, installs the skill, and runs
+`lms.py doctor`. Restart your agent host afterwards.
+
+Manual setup (if you prefer):
 
 > Replace `/path/to/induslms-agent` with your checkout path and
 > `you@indusschool.com` with your school email.
@@ -10,12 +22,15 @@ Read-only agent access to Indus LMS academics: **announcements, assignments, sha
 ```bash
 cd /path/to/induslms-agent
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .  # or: pip install -r requirements.txt
 
+cp .env.example .env  # then fill INDUSLMS_EMAIL/PASS/TENANT (.env auto-loaded)
 # Authenticate once (token saved OUTSIDE the repo)
 python3 lms.py login you@indusschool.com
 # or: INDUSLMS_EMAIL=... INDUSLMS_PASS=... python3 lms.py login
 
+# Health check
+python3 lms.py doctor
 # CLI
 python3 lms.py courses
 python3 lms.py assignments --course <course_id>
@@ -26,7 +41,10 @@ python3 lms.py notifications --unread-only --limit 5
 python3 lms.py attendance && python3 lms.py attendance-day
 ```
 
-Tokens live at `~/.induslms_token.json` (override with `INDUSLMS_TOKEN_FILE` in a future release; currently `lms.TOKEN_FILE`). Never committed — see `.gitignore`.
+Tokens live at `~/.induslms_token.json` (override with `INDUSLMS_TOKEN_FILE`). Never committed — see `.gitignore`.
+
+PyPI (after release): `pipx install induslms-agent` or `uvx induslms-agent doctor`,
+then `induslms login you@indusschool.com` + `induslms-server` as your MCP command.
 
 ## MCP server (recommended for agents)
 
@@ -38,9 +56,14 @@ python3 server.py
 
 Tools: `get_profile`, `list_courses`, `list_resources`, `get_resource`, `download_resource`, `assignments_overview`, `list_eol`, `list_assessments`, `list_notifications`, `get_attendance`, `get_attendance_day`, `list_announcements`, `list_calendar`, `schoolmail_search`, `schoolmail_read`, `schoolmail_folders`, `outlook_search`, `outlook_read`, `outlook_folders`.
 
-## School email (Apple Mail.app — no setup)
+Run with `python3 server.py` (or `induslms-server` after `pip install`). Copy-paste
+configs live in `examples/`: `.mcp.json` (Claude Code project scope),
+`claude_desktop_config.json.example`, `opencode.jsonc.example`,
+`mcp-uvx.json.example` (PyPI/uvx form).
 
-Mail.app already holds the `School` account, so agents read it via osascript (JXA). No credentials, no app registration:
+## School email (Apple Mail.app — macOS only)
+
+Mail.app already holds the `School` account, so agents read it via osascript (JXA). No credentials, no app registration. On Linux/Windows `schoolmail_*` reports unavailable — use `outlook_*` instead:
 
 ```bash
 python3 mailapp.py folders
@@ -84,12 +107,42 @@ In `~/.config/opencode/opencode.jsonc` under `mcp` (replace
 Restart opencode afterwards. Verify with a prompt like
 "list my courses using induslms-academics".
 
+### Claude Code
+
+```bash
+claude mcp add induslms-academics -- /path/to/induslms-agent/.venv/bin/python /path/to/induslms-agent/server.py
+# or project scope: copy .mcp.json (replace paths), then: claude mcp list
+```
+
+Skill: `bash scripts/install-skill.sh` also copies to `~/.claude/skills/`
+(`INSTALL_PROJECT_SKILL=1` for `.claude/skills/`).
+
+### Claude Desktop
+
+Copy `examples/claude_desktop_config.json.example` into
+`~/Library/Application Support/Claude/claude_desktop_config.json`
+(macOS; see file for Win/Linux paths), replace paths, relaunch.
+
+### OpenAI-compatible agents (code, no config file)
+
+```python
+from agents.mcp import MCPServerStdio
+async with MCPServerStdio(
+    params={"command": "/path/to/induslms-agent/.venv/bin/python",
+            "args": ["/path/to/induslms-agent/server.py"]},
+    cache_tools_list=True,
+) as server:
+    ...
+```
+
+Hosted MCP / GPT Actions need a public HTTPS endpoint (not provided;
+stdio-only by design).
+
 ## Skill (workflow guidance)
 
 `skills/induslms-academics/SKILL.md` teaches the workflow:
 announcements → assignments → resources/download → attendance,
-plus School inbox. Install (copies to pi `~/.pi/agent/skills/`
-and opencode `~/.config/opencode/skills/`):
+plus School inbox. Install (copies to pi, opencode, and Claude skills):
 
 ```bash
 bash scripts/install-skill.sh

@@ -11,6 +11,13 @@ from __future__ import annotations
 import os
 from typing import Any
 
+try:
+    from dotenv import load_dotenv as _load_dotenv
+
+    _load_dotenv()
+except Exception:
+    pass
+
 from mcp.server.fastmcp import FastMCP
 
 import lms
