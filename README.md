@@ -148,6 +148,14 @@ plus School inbox. Install (copies to pi, opencode, and Claude skills):
 bash scripts/install-skill.sh
 ```
 
+### End-user prompt: refresh local school materials
+
+`examples/update-resources.prompt.md` is a copy-paste template that
+checks LMS + the School mailbox for new teacher materials, downloads
+only what's missing into a `School/` folder, and parses everything to
+text. Fill in your subjects/teachers, paste it into a fresh agent
+session.
+
 ## Key API notes (reverse-engineered, verified live)
 
 * Base `https://api.induslms.com`, `Authorization: Bearer <access>` from `POST /api/v1/auth/login/`.
