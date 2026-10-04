@@ -4,6 +4,9 @@ Read-only agent access to Indus LMS academics: **announcements, assignments, sha
 
 ## Quickstart
 
+> Replace `/path/to/induslms-agent` with your checkout path and
+> `you@indusschool.com` with your school email.
+
 ```bash
 cd /path/to/induslms-agent
 python3 -m venv .venv && source .venv/bin/activate
@@ -50,7 +53,8 @@ Refs are `Mailbox:id`. Override account/mailbox with `SCHOOL_MAIL_ACCOUNT` / `SC
 
 ### Register in pi
 
-Create `~/.pi/agent/mcp.json` (same shape as `mcp.json` in this repo):
+Create `~/.pi/agent/mcp.json` (same shape as `mcp.json` in this repo,
+with `/path/to/induslms-agent` replaced by your checkout path):
 
 ```json
 { "mcpServers": { "induslms-academics": {
@@ -64,7 +68,8 @@ Use the venv python — system python lacks `mcp`/`msal`. Restart pi afterwards.
 
 ### Register in opencode
 
-In `~/.config/opencode/opencode.jsonc` under `mcp`:
+In `~/.config/opencode/opencode.jsonc` under `mcp` (replace
+`/path/to/induslms-agent` with your checkout path):
 
 ```json
 "induslms-academics": {

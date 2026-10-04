@@ -4,9 +4,14 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Secrets / tokens (never commit)
 .env
+.env.*
+!.env.example
 .induslms_token.json
 .indus_outlook_token.json
 *token*.json
