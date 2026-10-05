@@ -43,6 +43,25 @@ python3 lms.py attendance && python3 lms.py attendance-day
 
 Tokens live at `~/.induslms_token.json` (override with `INDUSLMS_TOKEN_FILE`). Never committed — see `.gitignore`.
 
+## Credentials (`.env`) — used by programs, never sent to the LLM
+
+```bash
+cp .env.example .env   # then fill in your own values
+```
+
+| Variable | Used by | Never leaves your machine |
+|---|---|---|
+| `INDUSLMS_EMAIL` / `INDUSLMS_PASS` | `lms.py login` only (one POST, then discarded) | ✅ |
+| `INDUSLMS_TENANT` | Tenant fallback when the token has no roles | ✅ |
+| `INDUSLMS_TOKEN_FILE` | Where the JWT is cached (`~/.induslms_token.json`) | ✅ |
+| `INDUS_OUTLOOK_CLIENT_ID` | Graph device-code login (`outlook.py login`) | ✅ |
+
+How it stays private:
+
+* `lms.py`, `outlook.py`, `server.py` load `.env` via `python-dotenv` at startup — values live only in the local process environment.
+* The MCP server exposes **no** login/token tools, and no tool ever returns passwords, tokens, or client IDs — tools return school data (assignments, mail, attendance) only.
+* `.gitignore` blocks `.env`, `*token*.json`, and downloads, so credentials can't be committed by accident. Share only `.env.example` (empty values).
+
 PyPI (after release): `pipx install induslms-agent` or `uvx induslms-agent doctor`,
 then `induslms login you@indusschool.com` + `induslms-server` as your MCP command.
 
@@ -54,7 +73,7 @@ Stdio, read-only tools only (no login, no mark-read, no submissions):
 python3 server.py
 ```
 
-Tools: `get_profile`, `list_courses`, `list_resources`, `get_resource`, `download_resource`, `assignments_overview`, `list_eol`, `list_assessments`, `list_notifications`, `get_attendance`, `get_attendance_day`, `list_announcements`, `list_calendar`, `schoolmail_search`, `schoolmail_read`, `schoolmail_folders`, `outlook_search`, `outlook_read`, `outlook_folders`.
+Tools: `get_profile`, `list_courses`, `list_resources`, `get_resource`, `download_resource`, `assignments_overview`, `list_eol`, `list_assessments`, `list_notifications`, `get_attendance`, `get_attendance_day`, `list_announcements`, `list_calendar`, `schoolmail_search`, `schoolmail_read`, `schoolmail_folders`, `outlook_search`, `outlook_read`, `outlook_folders`, `od_resolve_link`, `od_browse`, `od_download`.
 
 Run with `python3 server.py` (or `induslms-server` after `pip install`). Copy-paste
 configs live in `examples/`: `.mcp.json` (Claude Code project scope),
@@ -179,6 +198,7 @@ Read-only (`Mail.Read` delegated, device-code flow). Token cache at
 # 1. Entra ID -> App registrations -> New: allow public client flows,
 #    add delegated Mail.Read. Multitenant OK.
 export INDUS_OUTLOOK_CLIENT_ID=<app/client id>
+# ..or skip registration: export INDUS_USE_BUILTIN_CLIENT=1 (sign in as yourself)
 python3 outlook.py login        # approve code in browser
 python3 outlook.py search "assignment" --top 5
 python3 outlook.py search --sender teacher@indusschool.com --since 2026-09-01
@@ -187,4 +207,20 @@ python3 outlook.py read <message_id>
 
 MCP tools: `outlook_search`, `outlook_read`, `outlook_folders`
 (same coverage; unconfigured → clear error, not crash).
-School tenant blocks user consent → IT admin must grant admin consent first.
+School tenant blocks user consent → IT admin must grant admin consent first
+(not needed with `INDUS_USE_BUILTIN_CLIENT=1`).
+
+## OneDrive / SharePoint (school files via Microsoft Graph)
+
+Read-only (`Files.Read` + `Sites.Read.All`, same device-code flow and token
+cache as Outlook — re-run login once to consent to the new scopes):
+
+```bash
+python3 sharepoint.py login
+python3 sharepoint.py resolve <sharing-link-from-mail>  # shared file/folder metadata
+python3 sharepoint.py browse /                          # your OneDrive root
+python3 sharepoint.py download <item-id-or-link> --out /tmp/school
+```
+
+MCP tools: `od_resolve_link`, `od_browse`, `od_download`. No local OneDrive
+sync client needed — pure HTTPS, works on any OS.

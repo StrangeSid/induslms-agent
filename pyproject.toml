@@ -1,6 +1,6 @@
 [project]
 name = "induslms-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Read-only agent access to Indus LMS academics: announcements, assignments, shared resources, attendance"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,10 +33,11 @@ induslms = "lms:main"
 induslms-server = "server:main"
 induslms-outlook = "outlook:main"
 induslms-mailapp = "mailapp:main"
+induslms-sharepoint = "sharepoint:main"
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["lms", "server", "outlook", "mailapp"]
+py-modules = ["lms", "server", "outlook", "mailapp", "sharepoint"]

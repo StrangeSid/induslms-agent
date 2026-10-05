@@ -47,7 +47,8 @@ def test_mcp_tools_registered():
                      "download_resource", "list_notifications",
                      "get_attendance", "list_announcements",
                      "outlook_search", "outlook_read", "outlook_folders",
-                     "schoolmail_search", "schoolmail_read", "schoolmail_folders"):
+                     "schoolmail_search", "schoolmail_read", "schoolmail_folders",
+                     "od_resolve_link", "od_browse", "od_download"):
         assert expected in tools, f"missing MCP tool: {expected}"
 
 
@@ -68,6 +69,32 @@ def test_outlook_helpers_no_network():
 
     text = outlook.summarize_messages({"count": 0, "results": []})
     assert "messages: 0" in text
+
+
+def test_sharepoint_helpers_no_network():
+    import sharepoint
+
+    # least privilege, read-only
+    assert sharepoint.SCOPES == ["Files.Read", "Sites.Read.All"]
+
+    # encoder: determinism + round-trip + known shape (u! + base64url, no padding)
+    t1 = sharepoint.encode_sharing_url("https://example.com/a?b=c&d=e/f+g")
+    t2 = sharepoint.encode_sharing_url("https://example.com/a?b=c&d=e/f+g")
+    assert t1 == t2 and t1.startswith("u!") and "=" not in t1
+    assert "/" not in t1[2:] and "+" not in t1[2:]
+    import base64
+
+    padded = t1[2:].replace("-", "+").replace("_", "/")
+    padded += "=" * (-len(padded) % 4)
+    assert base64.b64decode(padded).decode() == "https://example.com/a?b=c&d=e/f+g"
+
+    assert sharepoint.build_browse_path() == "/me/drive/root/children"
+    assert sharepoint.build_browse_path("Math/Notes") == "/me/drive/root:/Math/Notes:/children"
+    assert sharepoint.build_browse_path("/", site_id="SID") == "/sites/SID/drive/root/children"
+
+    text = sharepoint.summarize_items({"count": 1, "results": [
+        {"name": "HW.pdf", "id": "1"}]})
+    assert "[FILE] HW.pdf" in text
 
 
 def test_mailapp_parse_noosascript():

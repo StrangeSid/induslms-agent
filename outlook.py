@@ -9,9 +9,11 @@ Setup (one time):
      - Supported account types: multitenant (or single-tenant in your
        school tenant if IT prefers). Enable "Allow public client flows".
      - API permissions -> add delegated ``Mail.Read``.
-  2. export INDUS_OUTLOOK_CLIENT_ID=<app (client) id>
-     [optional] export INDUS_OUTLOOK_AUTHORITY=https://login.microsoftonline.com/organizations
-  3. python3 outlook.py login   # prints a code; approve in the browser
+   2. export INDUS_OUTLOOK_CLIENT_ID=<app (client) id>
+      [optional] export INDUS_OUTLOOK_AUTHORITY=https://login.microsoftonline.com/organizations
+      (no registration? export INDUS_USE_BUILTIN_CLIENT=1 instead — uses
+      the pre-consented Microsoft Office client; you sign in as yourself)
+   3. python3 outlook.py login   # prints a code; approve in the browser
   4. python3 outlook.py search "assignment" --top 5
 
 If the school tenant blocks user consent, an IT admin must grant admin
@@ -41,6 +43,10 @@ SCOPES = ["Mail.Read"]
 CLIENT_ID_ENV = "INDUS_OUTLOOK_CLIENT_ID"
 AUTHORITY_ENV = "INDUS_OUTLOOK_AUTHORITY"
 TOKEN_CACHE_ENV = "INDUS_OUTLOOK_TOKEN_FILE"
+BUILTIN_OPT_IN_ENV = "INDUS_USE_BUILTIN_CLIENT"
+# Microsoft Office (first-party, pre-consented). Used ONLY when explicitly
+# opted in via INDUS_USE_BUILTIN_CLIENT=1 — no app registration needed.
+BUILTIN_CLIENT_ID = "d3590ed6-52b3-4102-aeff-aad2292ab01c"
 DEFAULT_AUTHORITY = "https://login.microsoftonline.com/common"
 TOKEN_CACHE = os.path.expanduser(os.environ.get(TOKEN_CACHE_ENV, "~/.indus_outlook_token.json"))
 
@@ -60,11 +66,15 @@ def _save_cache(cache: msal.SerializableTokenCache) -> None:
 
 def _client_id() -> str:
     cid = os.environ.get(CLIENT_ID_ENV)
-    if not cid:
-        raise RuntimeError(
-            f"Set {CLIENT_ID_ENV} to your Entra app (client) id. See outlook.py docstring."
-        )
-    return cid
+    if cid:
+        return cid
+    if os.environ.get(BUILTIN_OPT_IN_ENV) == "1":
+        return BUILTIN_CLIENT_ID
+    raise RuntimeError(
+        f"Set {CLIENT_ID_ENV} to your Entra app (client) id, or set "
+        f"{BUILTIN_OPT_IN_ENV}=1 to use the pre-consented Microsoft Office "
+        "client (no registration; you sign in as yourself)."
+    )
 
 
 def build_app() -> msal.PublicClientApplication:
