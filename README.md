@@ -38,7 +38,6 @@ Or from PyPI: `pipx install induslms-agent` (or `uvx induslms-agent doctor`), th
 
 ```bash
 pipx upgrade induslms-agent      # PyPI install
-# uvx needs nothing — it always fetches the latest release
 git pull && ./install.sh         # git clone (re-runs doctor to verify)
 ```
 
@@ -92,8 +91,6 @@ python3 sharepoint.py resolve <sharing-link-from-mail>
 python3 sharepoint.py browse /
 python3 sharepoint.py download <item-id-or-link> --out /tmp/school
 ```
-
-No sync client needed — pure HTTPS. Teacher sharing links pasted from mail resolve directly.
 
 ## Skill + prompt template
 
