@@ -5,6 +5,7 @@ description = "Read-only agent access to Indus LMS academics: announcements, ass
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+license-files = ["LICENSE*"]
 authors = [{ name = "IndusLMS Agent contributors" }]
 keywords = ["lms", "mcp", "education", "school", "agent"]
 classifiers = [
@@ -36,7 +37,7 @@ induslms-mailapp = "mailapp:main"
 induslms-sharepoint = "sharepoint:main"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
