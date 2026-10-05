@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: MIT OR GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 """School inbox via Apple Mail.app + osascript (JXA). No auth, no network setup.
 
 Reads the account's mailbox directly through Mail.app automation. Zero

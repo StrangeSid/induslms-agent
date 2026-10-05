@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: MIT OR GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 IndusLMS Agent Tool
 API Base: https://api.induslms.com

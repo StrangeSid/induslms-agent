@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/induslms-agent)](https://pypi.org/project/induslms-agent/)
 [![Python](https://img.shields.io/pypi/pyversions/induslms-agent)](https://pypi.org/project/induslms-agent/)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20GPL--3.0-blue)](LICENSE-MIT)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue)](COPYING)
 
 Read-only agent access to Indus LMS academics — announcements, assignments, shared resources, notifications, attendance — plus school email and OneDrive files. For `pi`, `opencode`, Claude Code/Desktop, and OpenAI-compatible agents via **MCP + Skill + CLI**.
 
@@ -93,4 +93,4 @@ No sync client needed — pure HTTPS. Teacher sharing links pasted from mail res
 
 ## Contributing, changelog, license
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md). Dual-licensed **MIT or GPL-3.0-or-later** — see [LICENSE-MIT](LICENSE-MIT) and [COPYING](COPYING).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md). Licensed under **GPL-3.0-or-later** — see [COPYING](COPYING).

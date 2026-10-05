@@ -4,8 +4,8 @@ version = "0.3.0"
 description = "Read-only agent access to Indus LMS academics: announcements, assignments, shared resources, attendance"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT OR GPL-3.0-or-later"
-license-files = ["LICENSE-MIT", "COPYING"]
+license = "GPL-3.0-or-later"
+license-files = ["COPYING"]
 authors = [{ name = "IndusLMS Agent contributors" }]
 keywords = ["lms", "mcp", "education", "school", "agent"]
 classifiers = [

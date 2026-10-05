@@ -29,8 +29,8 @@ rm -rf dist build *.egg-info # don't commit build artifacts
 
 ## License
 
-Contributions are accepted under the repo's dual license (**MIT or GPL-3.0-or-later**, see `LICENSE-MIT` and `COPYING`). By submitting a PR you agree your changes may be distributed under either license. New Python files should carry this header:
+This project is licensed under **GPL-3.0-or-later** (see `COPYING`). By submitting a PR you agree your changes will be distributed under the same license. New Python files should carry this header:
 
 ```python
-# SPDX-License-Identifier: MIT OR GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 ```
