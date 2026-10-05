@@ -2,6 +2,10 @@
 
 All notable changes, newest first. Versioning is manual (`pyproject.toml` + git tag).
 
+## 0.3.1 — 2026-10-05
+
+- License is now GPL-3.0-or-later only (`COPYING`); README rehaul, `CONTRIBUTING.md`, `CHANGELOG.md`
+
 ## 0.3.0 — 2026-10-05
 
 - OneDrive / SharePoint via Microsoft Graph (`sharepoint.py`, `od_resolve_link`, `od_browse`, `od_download`)
