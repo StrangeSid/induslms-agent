@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT OR GPL-3.0-or-later
 """IndusLMS MCP server (stdio, read-only).
 
 Academic tools (LMS) + school Outlook inbox tools (Graph). No login,

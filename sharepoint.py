@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT OR GPL-3.0-or-later
 """School OneDrive / SharePoint access via Microsoft Graph (read-only).
 
 Auth: same device-code flow + token cache as outlook.py (delegated,
