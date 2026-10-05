@@ -34,6 +34,16 @@ Or from PyPI: `pipx install induslms-agent` (or `uvx induslms-agent doctor`), th
 
 </details>
 
+### Updating
+
+```bash
+pipx upgrade induslms-agent      # PyPI install
+# uvx needs nothing — it always fetches the latest release
+git pull && ./install.sh         # git clone (re-runs doctor to verify)
+```
+
+No re-login needed: tokens live outside the repo and survive updates. If a release adds new Graph scopes, run `python3 sharepoint.py login` (or `outlook.py login`) once to consent.
+
 ## Configuration
 
 | Variable | Purpose |
