@@ -52,7 +52,7 @@ def merge_pi(path):
     data["mcpServers"]["induslms-academics"] = {
         "command": py, "args": [srv], "cwd": repo,
         "env": {"INDUSLMS_TENANT": "${INDUSLMS_TENANT}"},
-        "description": "Read-only Indus LMS academics + school inbox",
+        "description": "Indus LMS academics (reads + confirmed writes) + school inbox",
     }
     json.dump(data, open(path, "w"), indent=2)
     print(f"  pi: {path}")

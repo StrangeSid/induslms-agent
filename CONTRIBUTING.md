@@ -22,7 +22,7 @@ python lms.py doctor         # needs a valid login; reports issues, never raises
 rm -rf dist build *.egg-info # don't commit build artifacts
 ```
 
-- Keep MCP tools read-only. Never add login, mark-read, send, submit, or delete capabilities to `server.py`.
+- No login or token tools in `server.py`, and no tool may return a token. Tools that change school data start their description with `WRITE:`, go through `lms.api()` (raises `LMSError`, never retries), and get an offline test in `tests/test_writes.py`. Taking tests (EOL open/submit, FA answers) stays out of MCP.
 - Keep tool schemas small: no infra-only params (tenant is resolved server-side), bounded text outputs.
 - New pure helpers (URL encoders, path builders, parsers) must come with offline unit tests — see `test_sharepoint_helpers_no_network`.
 - Never commit `.env`, `*token*.json`, downloads, or personal data (emails, tenant IDs, absolute `/Users/...` paths). The test suite and review check for these.
