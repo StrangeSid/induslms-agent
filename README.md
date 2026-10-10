@@ -4,10 +4,10 @@
 [![Python](https://img.shields.io/pypi/pyversions/induslms-agent)](https://pypi.org/project/induslms-agent/)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](COPYING)
 
-Read-only agent access to Indus LMS academics — announcements, assignments, shared resources, notifications, attendance — plus school email and OneDrive files. For `pi`, `opencode`, Claude Code/Desktop, and OpenAI-compatible agents via **MCP + Skill + CLI**.
+Agent access to Indus LMS academics — announcements, assignments, results, learning tasks, shared resources, messages, notifications, attendance, policies — plus school email and OneDrive files. For `pi`, `opencode`, Claude Code/Desktop, and OpenAI-compatible agents via **MCP + Skill + CLI**.
 
 > [!NOTE]
-> This project is read-only by design. Nothing here can submit work, mark notifications read, send mail, or mutate school data.
+> Since 0.4.0 the client can also act for you: hand in files, send messages, mark notifications and announcements read, and ask for extensions. These calls are marked **WRITE**, never retry on their own, and the CLI asks before sending. Taking tests stays with the student: the interactive `induslms eol-take` exists, but no MCP tool answers or submits a test. School email and OneDrive remain read-only.
 
 ## Quickstart
 
@@ -53,15 +53,17 @@ No re-login needed: tokens live outside the repo and survive updates. If a relea
 | `INDUS_OUTLOOK_CLIENT_ID` | Your Entra app id for Graph login |
 | `INDUS_USE_BUILTIN_CLIENT=1` | Alternative: no registration — sign in as yourself via the pre-consented Microsoft Office client |
 
-Credentials live only in your local process environment. The MCP server exposes no login/token tools, no tool ever returns secrets, and `.gitignore` blocks `.env`, `*token*.json`, and downloads.
+Credentials live only in your local process environment. The MCP server exposes no login/token tools, no tool ever returns secrets, and `.gitignore` blocks `.env`, `*token*.json`, and downloads. The access token is refreshed shortly before it expires and the new pair is saved back (0600), so a lapsed token no longer breaks the CLI or MCP server. Upload tools refuse hidden paths and the token file.
 
 ## MCP server
 
-Stdio, 22 tools. Run with `python3 server.py` (or `induslms-server` after install).
+Stdio, 41 tools. Run with `python3 server.py` (or `induslms-server` after install).
 
 | Group | Tools |
 |---|---|
 | LMS academics | `get_profile`, `list_courses`, `list_resources`, `get_resource`, `download_resource`, `assignments_overview`, `list_eol`, `list_assessments`, `list_notifications`, `get_attendance`, `get_attendance_day`, `list_announcements`, `list_calendar` |
+| LMS details | `get_eol_result`, `get_assessment_submission`, `get_assessment_feedback`, `get_request_status`, `list_learning_tasks`, `get_learning_task`, `list_announcements_full`, `list_message_contacts`, `list_message_threads`, `get_conversation`, `list_policies` |
+| LMS writes | `send_message`, `mark_notification_read`, `mark_all_notifications_read`, `mark_announcement_read`, `request_extension_or_resubmission`, `cancel_request`, `submit_assessment_files`, `submit_learning_task` |
 | Mail (macOS, no setup) | `schoolmail_search`, `schoolmail_read`, `schoolmail_folders` |
 | Mail (Graph, any OS) | `outlook_search`, `outlook_read`, `outlook_folders` |
 | Files (Graph, any OS) | `od_resolve_link`, `od_browse`, `od_download` |
