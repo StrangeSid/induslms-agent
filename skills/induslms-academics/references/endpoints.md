@@ -10,7 +10,7 @@ Base: `https://api.induslms.com`, header `Authorization: Bearer <access>`,
 |---|---|
 | Profile | `GET /api/v1/auth/me/` |
 | Courses | `GET /api/v1/tenants/{tid}/me/student/courses?include_classes=true&include_teachers=true` |
-| Resources top-level | `GET /api/v1/tenants/{tid}/resources/?course_id={cid}&page=&page_size=` |
+| Resources top-level | `GET /api/v1/tenants/{tid}/resources/?course_id={cid}&page=&page_size=` (scope by enrolled course_id to avoid 403) |
 | Resource children | `GET /api/v1/tenants/{tid}/resources/?parent_resource_id={rid}` (NOT `?parent=`) |
 | Resource detail | `GET /api/v1/tenants/{tid}/resources/{rid}/` |
 | File content | `GET /api/v1/tenants/{tid}/resources/{rid}/files/{fid}/content/?disposition=attachment\|inline` (binary) |
@@ -29,6 +29,7 @@ Base: `https://api.induslms.com`, header `Authorization: Bearer <access>`,
 ## Shapes worth knowing
 
 * Resource: `{id, title, is_folder, child_count, teacher_name, course_id, file_urls: [{file_id, name, download_url}]}`. Folders have empty `file_urls`; files have `child_count: 0`.
+* Resource permission & scoping: Unfiltered queries (`/resources/` without `course_id`) return school-wide resources across all grades; crawling or accessing resources outside the student's enrolled grade/class returns HTTP 403 (`"Not allowed for your grade"`). Always scope top-level listings with `course_id` obtained from `list_courses`. If a resource yields 403, handle gracefully as grade-restricted.
 * EOL item: `{title, subject, topic, status, score, total_marks, expires_message, available_until}`.
 * Assessment wrapper: `{status, submitted_at, assessment: {title, subject, due_date, teacher_name, instructions}}`.
 * Notification: `{type (eol|fa|resource), title, message, link, course_id, is_read}`.

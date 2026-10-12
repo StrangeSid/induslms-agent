@@ -2,11 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """School OneDrive / SharePoint access via Microsoft Graph (read-only).
 
-Auth: same device-code flow + token cache as outlook.py (delegated,
-read-only). Adds file scopes on top of mail — re-run login once after
-upgrading scopes:
-  export INDUS_OUTLOOK_CLIENT_ID=<app id>  # or INDUS_USE_BUILTIN_CLIENT=1
-  python3 sharepoint.py login   # approve code in browser
+Auth: same browser sign-in + token cache as outlook.py (delegated,
+read-only, no Azure registration — builtin Office/Thunderbird clients).
+One `outlook.py login` already consents file scopes too; otherwise:
+  .venv/bin/python sharepoint.py login   # opens browser, sign in once
 
 Works on any OS (pure HTTPS; no OneDrive sync client or Mail.app needed).
 
@@ -52,39 +51,46 @@ def build_browse_path(path: str = "/", site_id: str | None = None) -> str:
     return f"{base}:/{p.strip('/')}:/children"
 
 
-def device_login() -> dict[str, Any]:
-    """Device-code login requesting file scopes (shares outlook's cache)."""
-    import msal
+def browser_login(timeout: int = 120) -> dict[str, Any]:
+    """Browser sign-in (no code typing). Same grant as outlook login."""
+    return outlook.browser_login(timeout=timeout)
 
-    app = outlook.build_app()
-    flow = app.initiate_device_flow(scopes=SCOPES)
-    if "user_code" not in flow:
-        raise RuntimeError(f"Device flow failed: {flow.get('error_description', flow)}")
-    print(flow["message"])
-    result = app.acquire_token_by_device_flow(flow)
-    outlook._save_cache(app.token_cache)
-    if "access_token" not in result:
-        raise RuntimeError(f"Login failed: {result.get('error_description', result)}")
-    print("[+] OneDrive/SharePoint login ok (scopes: Files.Read, Sites.Read.All)")
-    return {"token_type": result.get("token_type")}
+
+def device_login() -> dict[str, Any]:
+    """Device-code login (headless fallback)."""
+    import msal  # noqa: F401  (ensures dep present with a clear error)
+
+    last_err: str = ""
+    for cid in outlook.client_candidates():
+        app = outlook.build_app(cid)
+        flow = app.initiate_device_flow(scopes=outlook.ALL_SCOPES)
+        if "user_code" not in flow:
+            last_err = str(flow.get("error_description", flow))
+            if outlook._client_error_retryable(flow):
+                continue
+            raise RuntimeError(f"Device flow failed: {last_err}")
+        print(f"[*] Graph client {cid}")
+        print(flow["message"])
+        result = app.acquire_token_by_device_flow(flow)
+        outlook._save_cache(app.token_cache)
+        if "access_token" not in result:
+            raise RuntimeError(f"Login failed: {result.get('error_description', result)}")
+        print("[+] OneDrive/SharePoint login ok (scopes: Mail.Read, Files.Read, Sites.Read.All)")
+        return {"token_type": result.get("token_type")}
+    raise RuntimeError(f"Device flow failed on all builtin clients: {last_err}")
 
 
 def get_token() -> str:
     """Silent file-scoped token. Re-login if the grant lacks file scopes."""
     import msal  # noqa: F401  (ensures dep present with a clear error)
 
-    app = outlook.build_app()
-    accounts = app.get_accounts()
-    if not accounts:
-        raise RuntimeError("No Microsoft login. Run `python3 sharepoint.py login` first.")
-    result = app.acquire_token_silent(SCOPES, accounts[0])
-    if not result or "access_token" not in result:
+    try:
+        return outlook.get_token(SCOPES)
+    except RuntimeError as e:
         raise RuntimeError(
-            "No file access in the cached grant (scopes changed?). "
-            "Run `python3 sharepoint.py login` again to consent."
-        )
-    outlook._save_cache(app.token_cache)
-    return result["access_token"]
+            f"{e} (need Files.Read + Sites.Read.All — run "
+            "`python3 sharepoint.py login` once to consent)."
+        ) from e
 
 
 def graph_get(token: str, path: str, params: Optional[dict] = None) -> Any:
@@ -189,7 +195,10 @@ def main() -> None:
         return
     cmd, rest = args[0], args[1:]
     if cmd == "login":
-        device_login()
+        if "--device" in rest:
+            device_login()
+        else:
+            browser_login()
     elif cmd == "resolve":
         if not rest:
             print("Usage: sharepoint.py resolve <sharing-link>"); sys.exit(2)

@@ -16,21 +16,38 @@ never submit, mark-read, send, or delete anything.
 
 MY SUBJECTS & TEACHERS
 ----------------------
-Fill in your own subjects and teachers (example rows below):
+IBDP (example configuration):
 
-- Math HL      -> Teacher Name <teacher1@school.example>
-- English SL   -> Teacher Name <teacher2@school.example>
+- English L&L SL       -> Deepika Mehra        <deepika.mehra@school.example>
+- French B SL          -> Sankari Couppoussamy <sankari.couppoussamy@school.example>
+- Math AA SL           -> Nandakumar Mukundan  <nandakumar.mukundan@school.example>
+- Economics HL         -> Madhuri Mishra       <madhuri.mishra@school.example>
+- Computer Science SL  -> Anitha B Dominic    <anitha.dominic@school.example>
+- Business Management HL -> Arvind Kumar       <arvind.kumar@school.example>
+
+Other contacts:
+- DP Coordinator -> <dp.coordinator@school.example>
+- Head of School -> <ss.hos@school.example>
 
 Note: LMS course enrolment may name different staff for shared
 resources than the class teacher. Trust the teacher list above
 for email; accept any teacher's LMS resources for the matching subject.
+Flag as of 2026-10-08: LMS still shows Math as HL
+(Math Analysis and Approaches HL-G11-Nandakumar) while student reports
+Math AA SL — confirm level change with coordinator before renaming folders.
+LMS confirms Business Management HL (Business-G11-C6-Arvind).
 
 DIRECTORY CONVENTIONS (follow exactly)
 --------------------------------------
 - Root: `School/` (e.g. `~/Downloads/School/`)
 - One folder per subject, exact names matching your subjects
-  (e.g. `Math HL`, `English SL`), plus `Exam Syllabus` for general
-  exam material.
+  (`English L&L SL`, `French B SL`, `Math AA SL`, `Economics HL`,
+  `Computer Science SL`, `Business Management HL`), plus `Exam Syllabus`
+  for general exam material.
+  Legacy note: local `School/` still has `Math AA HL` and
+  `Business Management SL` from 2025-26 — rename to `Math AA SL` /
+  `Business Management HL` only after confirming level change, and keep
+  `Processed_Text (LLM Use)/` mirrors in sync.
 - Mirror teacher LMS folder names as subfolders (e.g. a topic or unit
   name shared by the teacher).
 - Parsed-text mirror: `Processed_Text (LLM Use)/<same subject>/<same
@@ -54,7 +71,7 @@ WORKFLOW
      and SAVE the new access+refresh pair immediately (rotation
      invalidates the old refresh token after a single use).
    - If refresh fails, STOP and ask the user to run:
-     `python3 lms.py login <you@school.example>`
+      `python3 lms.py login <you@school.example>`
      Do not proceed to LMS steps without valid auth. Email steps can
      still run (Mail.app needs no token).
 

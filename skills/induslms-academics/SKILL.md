@@ -22,8 +22,8 @@ Reads freely. **WRITE** tools (send, mark-read, extension requests, hand-ins) ch
 ## LMS workflow
 
 1. **Notices**: `list_announcements`, then `list_notifications --unread-only`. `link` routes into LMS (`/assignments/test/.../eol`, `/courses/.../resources/...`).
-2. **Assignments**: `assignments_overview [course_id]` merges EOL tests (status/score/`expires_message`), assessments (`due_date`, nested under `assessment`), resources. Report all three. `test-marks/me` PYP-only — DP returns `BAD_REQUEST`, use EOL + assessments. IDs from `list_courses`.
-3. **Resources**: `list_resources(course_id)` → usually folders (`is_folder`, `child_count`). Open via `parent_resource_id` (`children <id>`); `?parent=` unfiltered, avoid. `get_resource` → `file_urls[]` (`file_id`, `name`). `download_resource` saves to `~/Downloads/induslms`; read file after when asked about contents. Shapes: `references/endpoints.md`.
+2. **Assignments**: `assignments_overview [course_id]` merges EOL tests (status/score/`expires_message`), assessments (`due_date`, nested under `assessment`), learning tasks (`status`, `due_date`), and resources. Report all four. `test-marks/me` PYP-only — DP returns `BAD_REQUEST`, use EOL + assessments + tasks. IDs from `list_courses`.
+3. **Resources**: Scope queries to enrolled `course_id` via `list_resources(course_id)` to prevent `403 Not allowed for your grade` (unfiltered / other grades return 403). Top-level returns folders (`is_folder`, `child_count`). Open via `parent_resource_id` (`children <id>`); `?parent=` unfiltered, avoid. `get_resource` → `file_urls[]` (`file_id`, `name`). `download_resource` saves to `~/Downloads/induslms`; read file after when asked about contents. If a resource returns `403 Not allowed for your grade`, notify the student it belongs to another grade or restricted class. Shapes: `references/endpoints.md`.
 4. **Attendance**: `get_attendance` (sessions) + `get_attendance_day` (days + `reason`).
 5. **Results & feedback**: `get_eol_result(test_id=row id)` (answers vs correct + AI notes), `get_assessment_submission` / `get_assessment_feedback(assessment.id)`, `get_request_status([ids])` (extension/resubmission limits; `can_request.*` is `{ok, message}`).
 6. **Learning tasks**: `list_learning_tasks` + `get_learning_task(id)` (instructions, attachments, submission).
@@ -33,7 +33,7 @@ Reads freely. **WRITE** tools (send, mark-read, extension requests, hand-ins) ch
 ## Email workflow
 
 * Prefer Apple Mail.app tools — zero setup: `schoolmail_search [query] [--sender] [--since ISO]`, `schoolmail_read <Mailbox:id>`, `schoolmail_folders`. Account `School`, newest first.
-* Graph tools (`outlook_search/read/folders`) = fallback. Need `INDUS_OUTLOOK_CLIENT_ID` + one `outlook.py login`.
+* Graph tools (`outlook_search/read/folders`, `od_resolve_link/od_browse/od_list_sites/od_download`) = fallback, any OS. No Azure app needed — one `outlook.py login` via builtin Office → Thunderbird clients (one grant covers mail + files).
 * Match teacher emails ↔ `teacher_name/email` from `list_courses`; assignment titles ↔ subjects; inbox notices ↔ announcements.
 
 ## Output

@@ -50,14 +50,14 @@ No re-login needed: tokens live outside the repo and survive updates. If a relea
 | `INDUSLMS_EMAIL` / `INDUSLMS_PASS` | Used once by `lms.py login`, then discarded |
 | `INDUSLMS_TENANT` | Tenant fallback when the token has no roles |
 | `INDUSLMS_TOKEN_FILE` | Token cache path (default `~/.induslms_token.json`) |
-| `INDUS_OUTLOOK_CLIENT_ID` | Your Entra app id for Graph login |
-| `INDUS_USE_BUILTIN_CLIENT=1` | Alternative: no registration — sign in as yourself via the pre-consented Microsoft Office client |
+| `INDUS_OUTLOOK_CLIENT_ID` | Optional custom Entra app id (default: builtin Office → Thunderbird, no registration) |
+| `INDUS_USE_BUILTIN_CLIENT=0` | Force custom app id only (disables builtin Office/Thunderbird chain) |
 
 Credentials live only in your local process environment. The MCP server exposes no login/token tools, no tool ever returns secrets, and `.gitignore` blocks `.env`, `*token*.json`, and downloads. The access token is refreshed shortly before it expires and the new pair is saved back (0600), so a lapsed token no longer breaks the CLI or MCP server. Upload tools refuse hidden paths and the token file.
 
 ## MCP server
 
-Stdio, 41 tools. Run with `python3 server.py` (or `induslms-server` after install).
+Stdio, 42 tools. Run with `python3 server.py` (or `induslms-server` after install).
 
 | Group | Tools |
 |---|---|
@@ -66,7 +66,7 @@ Stdio, 41 tools. Run with `python3 server.py` (or `induslms-server` after instal
 | LMS writes | `send_message`, `mark_notification_read`, `mark_all_notifications_read`, `mark_announcement_read`, `request_extension_or_resubmission`, `cancel_request`, `submit_assessment_files`, `submit_learning_task` |
 | Mail (macOS, no setup) | `schoolmail_search`, `schoolmail_read`, `schoolmail_folders` |
 | Mail (Graph, any OS) | `outlook_search`, `outlook_read`, `outlook_folders` |
-| Files (Graph, any OS) | `od_resolve_link`, `od_browse`, `od_download` |
+| Files (Graph, any OS) | `od_resolve_link`, `od_browse`, `od_list_sites`, `od_download` |
 
 Connect your host (replace `/path/to` with your checkout; ready-made files in `examples/`):
 
@@ -81,17 +81,17 @@ Connect your host (replace `/path/to` with your checkout; ready-made files in `e
 ## School email
 
 - **Apple Mail.app (macOS, zero setup):** `python3 mailapp.py search "assignment" --top 5` — reads the existing `School` account via osascript. On other platforms these tools report unavailable; use Outlook instead.
-- **Outlook/Graph (any OS):** `python3 outlook.py login` (approve the code in your browser), then `search` / `read` / `folders`. Needs `Mail.Read`: your own app id + one admin consent, or `INDUS_USE_BUILTIN_CLIENT=1` for no-registration sign-in.
+- **Outlook/Graph (any OS, no registration, no code typing):** `.venv/bin/python outlook.py login` (browser opens, sign in once), then `search` / `read` / `folders`. Uses builtin Office → Thunderbird clients as yourself (`Mail.Read` user consent, no admin, no Azure app). Headless fallback: `login --device`.
 
-## OneDrive / SharePoint files (any OS)
+## OneDrive / SharePoint files (any OS, no registration)
 
-Same device-code flow and token cache as Outlook, plus `Files.Read` + `Sites.Read.All` (re-run login once to consent):
+Same browser sign-in + token cache as Outlook (`Files.Read` + `Sites.Read.All` user consent, one login covers mail + files):
 
 ```bash
-python3 sharepoint.py login
-python3 sharepoint.py resolve <sharing-link-from-mail>
-python3 sharepoint.py browse /
-python3 sharepoint.py download <item-id-or-link> --out /tmp/school
+.venv/bin/python sharepoint.py login
+.venv/bin/python sharepoint.py resolve <sharing-link-from-mail>
+.venv/bin/python sharepoint.py browse /
+.venv/bin/python sharepoint.py download <item-id-or-link> --out /tmp/school
 ```
 
 ## Skill + prompt template

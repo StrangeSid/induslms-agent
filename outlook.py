@@ -2,23 +2,26 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """School Outlook inbox access via Microsoft Graph (read-only).
 
-Auth: MSAL device-code flow, delegated ``Mail.Read`` only.
+Auth: MSAL browser sign-in (authcode + PKCE loopback), delegated
+``Mail.Read`` (plus ``User.Read`` on login so one grant also covers
+OneDrive/SharePoint). No code typing — browser opens, sign in as
+yourself, loopback captures grant.
 Token cache lives OUTSIDE the repo (never committed; see .gitignore).
 
-Setup (one time):
-  1. Azure Portal -> Microsoft Entra ID -> App registrations -> New:
-     - Supported account types: multitenant (or single-tenant in your
-       school tenant if IT prefers). Enable "Allow public client flows".
-     - API permissions -> add delegated ``Mail.Read``.
-   2. export INDUS_OUTLOOK_CLIENT_ID=<app (client) id>
-      [optional] export INDUS_OUTLOOK_AUTHORITY=https://login.microsoftonline.com/organizations
-      (no registration? export INDUS_USE_BUILTIN_CLIENT=1 instead — uses
-      the pre-consented Microsoft Office client; you sign in as yourself)
-   3. python3 outlook.py login   # prints a code; approve in the browser
-  4. python3 outlook.py search "assignment" --top 5
+Setup (one time, no Azure registration needed):
+  .venv/bin/python outlook.py login   # opens browser, sign in once
+  .venv/bin/python outlook.py search "assignment" --top 5
 
-If the school tenant blocks user consent, an IT admin must grant admin
-consent for Mail.Read on the app registration first.
+By default the login tries two pre-consented first-party clients
+(Microsoft Office, then Mozilla Thunderbird) and signs in as yourself —
+no app registration, no admin consent. To force your own Entra app
+instead: export INDUS_OUTLOOK_CLIENT_ID=<app (client) id>
+[optional] export INDUS_OUTLOOK_AUTHORITY=https://login.microsoftonline.com/organizations
+To disable the builtin chain: export INDUS_USE_BUILTIN_CLIENT=0.
+
+If the school tenant blocks user consent entirely, an IT admin must
+allow user consent for Mail.Read first (true for both custom and
+builtin clients).
 """
 
 from __future__ import annotations
@@ -45,10 +48,14 @@ CLIENT_ID_ENV = "INDUS_OUTLOOK_CLIENT_ID"
 AUTHORITY_ENV = "INDUS_OUTLOOK_AUTHORITY"
 TOKEN_CACHE_ENV = "INDUS_OUTLOOK_TOKEN_FILE"
 BUILTIN_OPT_IN_ENV = "INDUS_USE_BUILTIN_CLIENT"
-# Microsoft Office (first-party, pre-consented). Used ONLY when explicitly
-# opted in via INDUS_USE_BUILTIN_CLIENT=1 — no app registration needed.
+# First-party, pre-consented public clients — no app registration needed.
+# Office is tried first (already consented in most school tenants),
+# Thunderbird second (Mozilla's public client, same device-code flow).
 BUILTIN_CLIENT_ID = "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+THUNDERBIRD_CLIENT_ID = "08162f7c-0fd2-4200-a84a-f25a4db0b584"
 DEFAULT_AUTHORITY = "https://login.microsoftonline.com/common"
+# One login covers mail + files: login requests all, silent calls use subsets.
+ALL_SCOPES = ["User.Read", "Mail.Read", "Files.Read", "Sites.Read.All"]
 TOKEN_CACHE = os.path.expanduser(os.environ.get(TOKEN_CACHE_ENV, "~/.indus_outlook_token.json"))
 
 
@@ -65,58 +72,147 @@ def _save_cache(cache: msal.SerializableTokenCache) -> None:
         f.write(cache.serialize())
 
 
-def _client_id() -> str:
-    cid = os.environ.get(CLIENT_ID_ENV)
+def client_candidates() -> list[str]:
+    """Client IDs to try, in order. Explicit app id wins; otherwise Office
+    then Thunderbird. Set INDUS_USE_BUILTIN_CLIENT=0 to force explicit."""
+    cid = (os.environ.get(CLIENT_ID_ENV) or "").strip()
     if cid:
-        return cid
-    if os.environ.get(BUILTIN_OPT_IN_ENV) == "1":
-        return BUILTIN_CLIENT_ID
-    raise RuntimeError(
-        f"Set {CLIENT_ID_ENV} to your Entra app (client) id, or set "
-        f"{BUILTIN_OPT_IN_ENV}=1 to use the pre-consented Microsoft Office "
-        "client (no registration; you sign in as yourself)."
-    )
+        return [cid]
+    if os.environ.get(BUILTIN_OPT_IN_ENV) == "0":
+        raise RuntimeError(
+            f"Set {CLIENT_ID_ENV} to your Entra app (client) id, or unset "
+            f"{BUILTIN_OPT_IN_ENV}=0 to use the pre-consented builtin clients."
+        )
+    return [BUILTIN_CLIENT_ID, THUNDERBIRD_CLIENT_ID]
 
 
-def build_app() -> msal.PublicClientApplication:
+def _client_id() -> str:
+    return client_candidates()[0]
+
+
+CONSENT_RETRY_MARKERS = (
+    "unauthorized_client",
+    "invalid_client",
+    "aadsts700016",
+    "aadsts50020",
+    "aadsts65002",
+    "aadsts65001",
+    "consent_required",
+    "invalid_grant",
+)
+
+# Scope tiers: full first, then reduced. AADSTS65002 means client lacks
+# preauthorization for some Graph permission — retry with fewer scopes.
+SCOPE_TIERS = [
+    ["User.Read", "Mail.Read", "Files.Read", "Sites.Read.All"],
+    ["User.Read", "Mail.Read", "Files.Read"],
+    ["User.Read", "Mail.Read"],
+]
+
+
+def _client_error_retryable(flow: dict[str, Any]) -> bool:
+    blob = f"{flow.get('error', '')} {flow.get('error_description', '')}".lower()
+    return any(s in blob for s in CONSENT_RETRY_MARKERS)
+
+
+def _is_consent_retryable_msg(msg: str) -> bool:
+    blob = (msg or "").lower()
+    return any(s in blob for s in CONSENT_RETRY_MARKERS)
+
+
+def build_app(client_id: str | None = None) -> msal.PublicClientApplication:
     cache = _load_cache()
     return msal.PublicClientApplication(
-        _client_id(),
+        client_id or _client_id(),
         authority=os.environ.get(AUTHORITY_ENV, DEFAULT_AUTHORITY),
         token_cache=cache,
     )
 
 
-def device_login() -> dict[str, Any]:
-    """Interactive device-code login. Prints the code, blocks until approved."""
-    app = build_app()
-    flow = app.initiate_device_flow(scopes=SCOPES)
-    if "user_code" not in flow:
-        raise RuntimeError(f"Device flow failed: {flow.get('error_description', flow)}")
-    print(flow["message"])
-    result = app.acquire_token_by_device_flow(flow)
-    _save_cache(app.token_cache)
-    if "access_token" not in result:
-        raise RuntimeError(f"Login failed: {result.get('error_description', result)}")
-    account = (app.get_accounts() or [{}])[0]
-    print(f"[+] Outlook login ok for {account.get('username', 'unknown')}")
-    return {"account": account.get("username"), "token_type": result.get("token_type")}
+def browser_login(
+    timeout: int = 120, scopes: list[str] | None = None
+) -> dict[str, Any]:
+    """Browser sign-in (no code typing). Tries Office then Thunderbird.
+
+    Opens system browser to Microsoft sign-in; localhost loopback captures
+    authcode + PKCE. Falls through to next client/scope-tier on
+    unauthorized_client and AADSTS65002 (missing preauthorization).
+    """
+    last_err: str = ""
+    tiers = [scopes] if scopes else []
+    tiers += [t for t in SCOPE_TIERS if t != scopes]
+    for cid in client_candidates():
+        for tier in tiers:
+            app = build_app(cid)
+            print(f"[*] Graph client {cid} scopes={','.join(tier)} — opening browser…")
+            try:
+                result = app.acquire_token_interactive(
+                    scopes=tier, prompt="select_account", timeout=timeout
+                )
+            except Exception as e:
+                last_err = str(e)
+                if _is_consent_retryable_msg(last_err):
+                    continue
+                raise RuntimeError(f"Login failed: {last_err}")
+            if not result or "access_token" not in result:
+                last_err = str((result or {}).get("error_description", result))
+                if _is_consent_retryable_msg(last_err):
+                    continue
+                raise RuntimeError(f"Login failed: {last_err}")
+            _save_cache(app.token_cache)
+            account = (app.get_accounts() or [{}])[0]
+            print(f"[+] Outlook login ok for {account.get('username', 'unknown')}")
+            if tier != ALL_SCOPES:
+                print(f"[!] Granted reduced scopes {tier}; rerun login for more.")
+            return {"account": account.get("username"), "token_type": result.get("token_type")}
+    raise RuntimeError(f"Browser login failed on all builtin clients: {last_err}")
 
 
-def get_token() -> str:
-    """Silent token from cache (refreshes automatically). Raises with login hint."""
-    app = build_app()
-    accounts = app.get_accounts()
-    if not accounts:
-        raise RuntimeError("No Outlook login. Run `python3 outlook.py login` first.")
-    result = app.acquire_token_silent(SCOPES, accounts[0])
-    if not result or "access_token" not in result:
-        raise RuntimeError(
-            "Cached Outlook token expired and silent refresh failed. "
-            "Run `python3 outlook.py login` again."
-        )
-    _save_cache(app.token_cache)
-    return result["access_token"]
+def device_login(scopes: list[str] | None = None) -> dict[str, Any]:
+    """Device-code login (fallback for headless). Tries Office then Thunderbird."""
+    last_err: str = ""
+    tiers = [scopes] if scopes else []
+    tiers += [t for t in SCOPE_TIERS if t != scopes]
+    for cid in client_candidates():
+        for tier in tiers:
+            app = build_app(cid)
+            flow = app.initiate_device_flow(scopes=tier)
+            if "user_code" not in flow:
+                last_err = str(flow.get("error_description", flow))
+                if _client_error_retryable(flow):
+                    continue
+                raise RuntimeError(f"Device flow failed: {last_err}")
+            print(f"[*] Graph client {cid} scopes={','.join(tier)}")
+            print(flow["message"])
+            result = app.acquire_token_by_device_flow(flow)
+            if "access_token" not in result:
+                last_err = str(result.get("error_description", result))
+                if _is_consent_retryable_msg(last_err):
+                    continue
+                raise RuntimeError(f"Login failed: {last_err}")
+            _save_cache(app.token_cache)
+            account = (app.get_accounts() or [{}])[0]
+            print(f"[+] Outlook login ok for {account.get('username', 'unknown')}")
+            return {"account": account.get("username"), "token_type": result.get("token_type")}
+    raise RuntimeError(f"Device flow failed on all builtin clients: {last_err}")
+
+
+def get_token(scopes: list[str] | None = None) -> str:
+    """Silent token from cache (refreshes automatically). Tries each client."""
+    want = scopes or SCOPES
+    for cid in client_candidates():
+        app = build_app(cid)
+        accounts = app.get_accounts()
+        if not accounts:
+            continue
+        result = app.acquire_token_silent(want, accounts[0])
+        if result and "access_token" in result:
+            _save_cache(app.token_cache)
+            return result["access_token"]
+    raise RuntimeError(
+        "No Microsoft login. Run `python3 outlook.py login` first "
+        "(no Azure app needed — builtin Office/Thunderbird clients)."
+    )
 
 
 def graph_get(token: str, path: str, params: Optional[dict] = None) -> Any:
@@ -212,7 +308,10 @@ def main() -> None:
     cmd = args[0]
     rest = args[1:]
     if cmd == "login":
-        device_login()
+        if "--device" in rest:
+            device_login()
+        else:
+            browser_login()
     elif cmd == "folders":
         print(json.dumps(list_folders(), indent=2, default=str))
     elif cmd == "search":

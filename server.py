@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """IndusLMS MCP server (stdio).
 
-Academic tools (LMS) + school Outlook inbox tools (Graph). Auth comes from
-token files created via `lms.py login` / `outlook.py login` (never
-committed; see README). The LMS access token is refreshed before it
-expires; no tool ever returns a token.
+Academic tools (LMS) + school Outlook inbox + OneDrive/SharePoint tools
+(Graph). Auth comes from token files created via `lms.py login` /
+`outlook.py login` (never committed; see README). Graph login needs no
+Azure registration — builtin Office/Thunderbird clients. The LMS access
+token is refreshed before it expires; no tool ever returns a token.
 
 Tools whose description starts with WRITE change school data (messages,
 mark-read, extension requests, handing in files). Taking tests (EOL
@@ -111,7 +112,7 @@ def download_resource(resource_id: str, file_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 def assignments_overview(course_id: str | None = None) -> dict[str, Any]:
-    """Unified assignments: EOL tests + assessments + shared resources (raw payloads)."""
+    """Unified assignments: EOL tests + assessments + learning tasks + shared resources (raw payloads)."""
     token, tid = _ctx()
     return lms.assignments_overview(token, tid, course_id)
 
@@ -311,11 +312,13 @@ def list_calendar() -> dict[str, Any]:
 def _outlook():
     import outlook  # deferred: msal only needed for email tools
 
-    if not os.environ.get(outlook.CLIENT_ID_ENV):
+    try:
+        outlook.client_candidates()
+    except RuntimeError as e:
         raise RuntimeError(
-            f"Outlook not configured. Set {outlook.CLIENT_ID_ENV}, "
-            "then run `python3 outlook.py login`. See README."
-        )
+            f"{e} Then run `python3 outlook.py login` (no Azure app needed). "
+            "See README."
+        ) from e
     return outlook
 
 
@@ -386,6 +389,12 @@ def od_resolve_link(link: str) -> dict[str, Any]:
 def od_browse(path: str = "/", site_id: str | None = None) -> dict[str, Any]:
     """List a OneDrive folder by path (or a SharePoint default-drive folder with site_id)."""
     return _sharepoint().browse(path, site_id)
+
+
+@mcp.tool()
+def od_list_sites(query: str | None = None) -> dict[str, Any]:
+    """Find SharePoint sites (for the site_id used by od_browse)."""
+    return _sharepoint().list_sites(query)
 
 
 @mcp.tool()

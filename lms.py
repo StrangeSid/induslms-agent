@@ -409,18 +409,20 @@ def assignments_overview(token: str, tenant_id: str, course_id: str = None) -> d
     Merges (all GET):
       - EOL tests (/eol-tests/my/) — primary teacher-published assignments
       - Student assessments (/student/assessments/) — FA/SDL tasks with due dates
+      - Learning tasks (/tenants/.../assignments/student/list/) — class assignments
       - Shared resources (/resources/) — teacher materials (folders + files)
       - test-marks/me skipped for DP (PYP-only; returns BAD_REQUEST)
-    Returns {eol, assessments, resources, course_id} with raw payloads so
+    Returns {eol, assessments, tasks, resources, course_id} with raw payloads so
     callers can render either JSON or a summary.
     """
     eol = eol_tests(token, tenant_id)
     assess = assessments(token)
+    tasks = learning_tasks(token, tenant_id, course_id=course_id)
     if course_id:
         res = list_resources(token, tenant_id, course_id=course_id, page_size=50)
     else:
         res = list_resources(token, tenant_id, page_size=20)
-    return {"course_id": course_id, "eol": eol, "assessments": assess, "resources": res}
+    return {"course_id": course_id, "eol": eol, "assessments": assess, "tasks": tasks, "resources": res}
 
 
 def summarize_assignments(overview: dict, limit_each: int = 15) -> str:
@@ -428,6 +430,7 @@ def summarize_assignments(overview: dict, limit_each: int = 15) -> str:
     lines = []
     eol = overview.get("eol") or {}
     assess = overview.get("assessments") or {}
+    tasks = overview.get("tasks") or []
     res = overview.get("resources") or {}
     if isinstance(eol, dict):
         results = eol.get("results") or []
@@ -445,6 +448,15 @@ def summarize_assignments(overview: dict, limit_each: int = 15) -> str:
             lines.append(
                 f"  [{a.get('status')}] {inner.get('title')} ({inner.get('subject')}) "
                 f"due={inner.get('due_date')} teacher={inner.get('teacher_name')}"
+            )
+    task_rows = tasks.get("results") if isinstance(tasks, dict) else (tasks if isinstance(tasks, list) else [])
+    if task_rows:
+        count = tasks.get("count", len(task_rows)) if isinstance(tasks, dict) else len(task_rows)
+        lines.append(f"Learning tasks: {count} total")
+        for t in task_rows[:limit_each]:
+            lines.append(
+                f"  [{t.get('status')}] {t.get('title')} ({t.get('subject')}) "
+                f"due={t.get('due_date')}"
             )
     if isinstance(res, dict):
         results = res.get("results") or []
@@ -577,8 +589,8 @@ def session_context(margin: int = 300) -> tuple:
     if not data or not data.get("access"):
         raise RuntimeError("No LMS token. Run `induslms login <email>` first.")
     user = data.get("user") or {}
-    roles = user.get("roles") or []
-    tenant = (roles[0].get("tenant_id") if roles else None) or os.environ.get("INDUSLMS_TENANT")
+    roles = user.get("roles") or data.get("roles") or []
+    tenant = next((r.get("tenant_id") for r in roles if r.get("tenant_id")), None) or data.get("tenant_id") or os.environ.get("INDUSLMS_TENANT")
     if not tenant:
         raise RuntimeError("No tenant ID. Set INDUSLMS_TENANT or log in again.")
     return data["access"], tenant, user.get("id")
@@ -941,14 +953,17 @@ def doctor() -> dict:
         except Exception as e:
             checks["lms_api"] = f"fail: {e}"
             result["ok"] = False
-        roles = (token_data.get("user") or {}).get("roles") or []
-        tenant = roles[0].get("tenant_id") if roles else os.environ.get("INDUSLMS_TENANT")
+        roles = (token_data.get("user") or {}).get("roles") or token_data.get("roles") or []
+        tenant = next((r.get("tenant_id") for r in roles if r.get("tenant_id")), None) or token_data.get("tenant_id") or os.environ.get("INDUSLMS_TENANT")
         checks["tenant"] = "ok" if tenant else "missing (set INDUSLMS_TENANT or re-login)"
 
-    if not os.environ.get("INDUS_OUTLOOK_CLIENT_ID"):
-        checks["outlook"] = "unconfigured (outlook_* disabled; set INDUS_OUTLOOK_CLIENT_ID + run outlook.py login)"
-    else:
-        checks["outlook"] = "configured"
+    try:
+        import outlook as _ol
+
+        _ol.client_candidates()
+        checks["outlook"] = "configured (builtin Office/Thunderbird; run outlook.py login once)"
+    except Exception:
+        checks["outlook"] = "unconfigured (set INDUS_OUTLOOK_CLIENT_ID or unset INDUS_USE_BUILTIN_CLIENT=0)"
 
     if shutil.which("osascript") is None:
         checks["schoolmail"] = "unavailable (macOS Mail.app only; schoolmail_* disabled on this platform)"
@@ -1231,7 +1246,8 @@ Environment (.env supported via python-dotenv):
 
     token_data = load_token() if cmd == "login" else ensure_fresh_token()
     token = token_data.get("access") if token_data else None
-    tenant_id = token_data.get("user", {}).get("roles", [{}])[0].get("tenant_id") if token_data else None
+    roles = ((token_data.get("user") or {}).get("roles") or token_data.get("roles") or []) if token_data else []
+    tenant_id = (next((r.get("tenant_id") for r in roles if r.get("tenant_id")), None) or token_data.get("tenant_id") or os.environ.get("INDUSLMS_TENANT")) if token_data else os.environ.get("INDUSLMS_TENANT")
 
     if cmd == "login":
         email = args[1] if len(args) > 1 else os.environ.get("INDUSLMS_EMAIL") or input("Email: ")
