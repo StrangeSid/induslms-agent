@@ -463,7 +463,9 @@ def summarize_assignments(overview: dict, limit_each: int = 15) -> str:
         lines.append(f"Shared resources: {res.get('count', len(results))} total")
         for r in results[:limit_each]:
             kind = "FOLDER" if r.get("is_folder") else "FILE"
-            lines.append(f"  [{kind}] {r.get('title')} by {r.get('teacher_name')}")
+            files = r.get("file_urls") or []
+            extra = f" ({len(files)} files: {', '.join(f.get('name', '') for f in files[:3])})" if not r.get("is_folder") and files else ""
+            lines.append(f"  [{kind}] {r.get('title')}{extra} by {r.get('teacher_name')}")
     lines.append("Note: test-marks/me is PYP-only (DP returns BAD_REQUEST) — use EOL + assessments.")
     return "\n".join(lines)
 
