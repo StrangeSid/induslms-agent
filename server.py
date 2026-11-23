@@ -90,17 +90,21 @@ def list_resources(
     parent_resource_id: str | None = None,
     page: int = 1,
     page_size: int = 20,
+    student_profile_id: str | None = None,
 ) -> dict[str, Any]:
-    """Shared teacher resources (folders + files). Use parent_resource_id to open a folder."""
+    """Shared teacher resources (folders + files). Use parent_resource_id to open a folder.
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.list_resources(token, tid, course_id, parent_resource_id, page, page_size)
+    return lms.list_resources(token, tid, course_id, parent_resource_id, page, page_size,
+                              student_id=student_profile_id)
 
 
 @mcp.tool()
-def get_resource(resource_id: str) -> dict[str, Any]:
-    """One resource's metadata: folder flag, child_count, file_urls with file_ids."""
+def get_resource(resource_id: str, student_profile_id: str | None = None) -> dict[str, Any]:
+    """One resource's metadata: folder flag, child_count, file_urls with file_ids.
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.get_resource(token, tid, resource_id)
+    return lms.get_resource(token, tid, resource_id, student_id=student_profile_id)
 
 
 @mcp.tool()
@@ -111,40 +115,53 @@ def download_resource(resource_id: str, file_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def assignments_overview(course_id: str | None = None) -> dict[str, Any]:
-    """Unified assignments: EOL tests + assessments + learning tasks + shared resources (raw payloads)."""
+def assignments_overview(course_id: str | None = None,
+                         student_profile_id: str | None = None) -> dict[str, Any]:
+    """Unified assignments: EOL tests + assessments + learning tasks + shared resources (raw payloads).
+    Parents pass the child's student_profile_id (from list_children)."""
     token, tid = _ctx()
+    if student_profile_id:
+        rows = lms.parent_overview(token, tid, student_profile_id).get("children") or []
+        return rows[0] if rows else {"children": []}
     return lms.assignments_overview(token, tid, course_id)
 
 
 @mcp.tool()
 def list_eol(limit: int | None = None, offset: int = 0, course_id: str | None = None,
-             year: str | None = None) -> dict[str, Any]:
-    """Teacher-published end-of-lesson tests with status, score, due messages and attempt flags."""
+             year: str | None = None, student_profile_id: str | None = None) -> dict[str, Any]:
+    """Teacher-published end-of-lesson tests with status, score, due messages and attempt flags.
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.eol_tests(token, tid, limit, offset, course_id=course_id, year=year)
+    return lms.eol_tests(token, tid, limit, offset, course_id=course_id, year=year,
+                         student_id=student_profile_id)
 
 
 @mcp.tool()
-def list_assessments(assessment_type: str | None = None, course_id: str | None = None) -> list[dict[str, Any]]:
+def list_assessments(assessment_type: str | None = None, course_id: str | None = None,
+                     student_profile_id: str | None = None) -> list[dict[str, Any]]:
     """Every FA/SA assessment (all pages) with due dates, marks and teacher names.
-    assessment_type: "FA" or "SA"."""
+    assessment_type: "FA" or "SA". Parents pass the child's student_profile_id."""
     token, _ = _ctx()
-    return lms.assessments_all(token, assessment_type, course_id)
+    return lms.assessments_all(token, assessment_type, course_id,
+                               student_id=student_profile_id)
 
 
 @mcp.tool()
-def get_assessment_submission(assessment_id: str) -> dict[str, Any]:
-    """What the student handed in for one FA/SA (files, comment, time). Takes assessment.id."""
+def get_assessment_submission(assessment_id: str,
+                              student_profile_id: str | None = None) -> dict[str, Any]:
+    """What the student handed in for one FA/SA (files, comment, time). Takes assessment.id.
+    Parents pass the child's student_profile_id."""
     token, _ = _ctx()
-    return lms.assessment_submission(token, assessment_id)
+    return lms.assessment_submission(token, assessment_id, student_id=student_profile_id)
 
 
 @mcp.tool()
-def get_assessment_feedback(assessment_id: str) -> dict[str, Any]:
-    """Teacher feedback for one FA/SA: total score, comments, rubric scores, annotated files."""
+def get_assessment_feedback(assessment_id: str,
+                            student_profile_id: str | None = None) -> dict[str, Any]:
+    """Teacher feedback for one FA/SA: total score, comments, rubric scores, annotated files.
+    Parents pass the child's student_profile_id."""
     token, _ = _ctx()
-    return lms.assessment_feedback(token, assessment_id)
+    return lms.assessment_feedback(token, assessment_id, student_id=student_profile_id)
 
 
 @mcp.tool()
@@ -162,31 +179,37 @@ def get_eol_result(test_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def list_learning_tasks(course_id: str | None = None) -> list[dict[str, Any]]:
-    """Learning tasks with instructions, due dates, status, score and attachment links."""
+def list_learning_tasks(course_id: str | None = None,
+                        student_profile_id: str | None = None) -> list[dict[str, Any]]:
+    """Learning tasks with instructions, due dates, status, score and attachment links.
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.learning_tasks(token, tid, course_id)
+    return lms.learning_tasks(token, tid, course_id, student_id=student_profile_id)
 
 
 @mcp.tool()
-def get_learning_task(task_id: str) -> dict[str, Any]:
-    """One learning task with the student's submission, score and feedback."""
+def get_learning_task(task_id: str, student_profile_id: str | None = None) -> dict[str, Any]:
+    """One learning task with the student's submission, score and feedback.
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.learning_task_detail(token, tid, task_id)
+    return lms.learning_task_detail(token, tid, task_id, student_id=student_profile_id)
 
 
 @mcp.tool()
-def list_announcements_full(academic_year: str | None = None) -> list[dict[str, Any]]:
-    """Announcements visible to the student with full HTML bodies, sender and attachment URLs."""
+def list_announcements_full(academic_year: str | None = None,
+                            student_profile_id: str | None = None) -> list[dict[str, Any]]:
+    """Announcements visible to the student with full HTML bodies, sender and attachment URLs.
+    Parents pass the child's student_profile_id."""
     token, _ = _ctx()
-    return lms.announcements_visible(token, academic_year)
+    return lms.announcements_visible(token, academic_year, student_id=student_profile_id)
 
 
 @mcp.tool()
-def list_message_contacts() -> list[dict[str, Any]]:
-    """Teachers and staff the student can message (user_id, name, role, subjects)."""
+def list_message_contacts(student_profile_id: str | None = None) -> list[dict[str, Any]]:
+    """Teachers and staff the student can message (user_id, name, role, subjects).
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.message_contacts(token, tid)
+    return lms.message_contacts(token, tid, student_id=student_profile_id)
 
 
 @mcp.tool()
@@ -274,11 +297,14 @@ def submit_learning_task(task_id: str, file_paths: list[str], text: str = "") ->
 
 @mcp.tool()
 def list_notifications(
-    limit: int = 20, offset: int = 0, unread_only: bool = False
+    limit: int = 20, offset: int = 0, unread_only: bool = False,
+    student_profile_id: str | None = None,
 ) -> dict[str, Any]:
-    """Notifications with unread_count and deep links (reading never marks them read)."""
+    """Notifications with unread_count and deep links (reading never marks them read).
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.notifications(token, tid, limit, offset, unread_only)
+    return lms.notifications(token, tid, limit, offset, unread_only,
+                             student_id=student_profile_id)
 
 
 @mcp.tool()
@@ -289,10 +315,13 @@ def get_attendance() -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_attendance_day() -> dict[str, Any]:
-    """Day-wise attendance breakdown (working days, per-date status/reason)."""
+def get_attendance_day(student_profile_id: str | None = None,
+                       from_date: str | None = None, to_date: str | None = None) -> dict[str, Any]:
+    """Day-wise attendance breakdown (working days, per-date status/reason).
+    Parents pass the child's student_profile_id."""
     token, tid = _ctx()
-    return lms.attendance_day(token, tid)
+    return lms.attendance_day(token, tid, student_id=student_profile_id,
+                              from_date=from_date, to_date=to_date)
 
 
 @mcp.tool()
@@ -307,6 +336,59 @@ def list_calendar() -> dict[str, Any]:
     """School calendar events."""
     token, _ = _ctx()
     return lms.calendar_events(token)
+
+
+# --- Parents (the token may belong to a parent account) ----------------------
+
+
+@mcp.tool()
+def list_children() -> list[dict[str, Any]]:
+    """Children linked to the signed-in parent (student_profile_id, user_id, name, program, class)."""
+    token, _ = _ctx()
+    return lms.parent_children(token)
+
+
+@mcp.tool()
+def child_courses(student_profile_id: str, year: str | None = None) -> dict[str, Any]:
+    """One child's courses with classes (and teachers when the API returns them)."""
+    token, tid = _ctx()
+    return lms.parent_child_courses(token, tid, student_profile_id, year)
+
+
+@mcp.tool()
+def child_attendance(student_profile_id: str | None = None,
+                     from_date: str | None = None, to_date: str | None = None) -> dict[str, Any]:
+    """Attendance for one child or all children: summary plus day/subject records."""
+    token, tid = _ctx()
+    summary = lms.parent_attendance(token, from_date, to_date)
+    if student_profile_id:
+        summary = [s for s in summary if s.get("student_id") == student_profile_id]
+    day = (lms.attendance_day(token, tid, student_id=student_profile_id,
+                              from_date=from_date, to_date=to_date)
+           if student_profile_id else {})
+    return {"summary": summary, "day": day}
+
+
+@mcp.tool()
+def child_calendar(student_profile_id: str, from_date: str | None = None,
+                   to_date: str | None = None) -> dict[str, Any]:
+    """One child's calendar: EOL openings/closings and FA submissions, with course ids."""
+    token, tid = _ctx()
+    return lms.parent_child_calendar(token, tid, student_profile_id, from_date, to_date)
+
+
+@mcp.tool()
+def child_learner_profile(student_profile_id: str, year: str | None = None) -> dict[str, Any]:
+    """One child's learner profile: subjects with FA/SA items, marks and feedback."""
+    token, _ = _ctx()
+    return lms.parent_child_learner_profile(token, student_profile_id, year)
+
+
+@mcp.tool()
+def child_overview(student_profile_id: str | None = None, year: str | None = None) -> dict[str, Any]:
+    """One child (or all children) merged: courses, EOL, FA/SA, tasks and resources."""
+    token, tid = _ctx()
+    return lms.parent_overview(token, tid, student_profile_id, year)
 
 
 def _outlook():

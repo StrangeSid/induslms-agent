@@ -150,14 +150,19 @@ def attendance(token: str) -> dict:
     return HTTP.get(url, headers=get_auth_headers(token), timeout=15).json()
 
 
-def attendance_day(token: str, tenant_id: str) -> dict:
+def attendance_day(token: str, tenant_id: str, student_id: str = None,
+                   from_date: str = None, to_date: str = None) -> dict:
     """Get day-wise attendance breakdown for the tenant (read-only).
 
     Returns {total_working_days, present_days, absent_days, ...,
              attendance_percentage, records: [{date, status, reason, class}]}.
+    Parents pass the child's student_profile_id as `student_id`; `from_date` /
+    `to_date` are ISO dates (the parent portal defaults to the last 90 days).
     """
+    params = {k: v for k, v in (("student_id", student_id), ("from_date", from_date),
+                                ("to_date", to_date)) if v}
     url = f"{API_BASE}/api/v1/tenants/{tenant_id}/students/me/attendance/day/"
-    return HTTP.get(url, headers=get_auth_headers(token), timeout=15).json()
+    return HTTP.get(url, headers=get_auth_headers(token), params=params or None, timeout=15).json()
 
 
 def summarize_attendance(summary: dict, day: dict = None) -> str:
@@ -184,15 +189,20 @@ def summarize_attendance(summary: dict, day: dict = None) -> str:
     return "\n".join(lines)
 
 
-def notifications(token: str, tenant_id: str, limit=20, offset=0, unread_only=False) -> dict:
+def notifications(token: str, tenant_id: str, limit=20, offset=0, unread_only=False,
+                  student_id: str = None) -> dict:
     """Get notifications. Reading never marks anything read; use
     notification_read() / notifications_read_all() for that.
 
     Server supports ?limit=&offset=. unread_only is applied client-side
-    via is_read.
+    via is_read. Parents pass the child's student_profile_id as `student_id`;
+    the response then also carries `unread_counts_by_student`.
     """
-    url = f"{API_BASE}/api/v1/tenants/{tenant_id}/notifications/?limit={limit}&offset={offset}"
-    data = HTTP.get(url, headers=get_auth_headers(token), timeout=15).json()
+    params = {"limit": limit, "offset": offset}
+    if student_id:
+        params["student_id"] = student_id
+    url = f"{API_BASE}/api/v1/tenants/{tenant_id}/notifications/"
+    data = HTTP.get(url, headers=get_auth_headers(token), params=params, timeout=15).json()
     if unread_only and isinstance(data, dict) and isinstance(data.get("results"), list):
         data = {**data, "results": [r for r in data["results"] if not r.get("is_read")]}
     return data
@@ -237,7 +247,7 @@ def assessments(token: str, params: dict = None) -> dict:
 
 
 def eol_tests(token: str, tenant_id: str, limit: int = None, offset: int = 0,
-              course_id: str = None, year: str = None) -> dict:
+              course_id: str = None, year: str = None, student_id: str = None) -> dict:
     """Get EOL (end-of-lesson) tests — these are teacher-published assignments.
 
     Server returns the full list (count ~23); limit/offset are applied
@@ -247,9 +257,12 @@ def eol_tests(token: str, tenant_id: str, limit: int = None, offset: int = 0,
     `year` is the academic year, e.g. "2026-27". Rows carry `id` (uuid),
     `short_id` (what the open call takes) and the attempt flags
     (`can_attempt`, `is_expired`, `attempts_blocked`, `proctor_suspended`, ...).
+    Parents pass the child's student_profile_id as `student_id` (list + score
+    only; the per-student result endpoint is 403 for parents).
     """
     url = f"{API_BASE}/api/v1/tenants/{tenant_id}/eol-tests/my/"
-    params = {k: v for k, v in (("course_id", course_id), ("year", year)) if v}
+    params = {k: v for k, v in (("course_id", course_id), ("year", year),
+                                ("student_id", student_id)) if v}
     data = HTTP.get(url, headers=get_auth_headers(token), params=params or None, timeout=15).json()
     if isinstance(data, dict) and isinstance(data.get("results"), list):
         results = data["results"]
@@ -300,6 +313,7 @@ def list_resources(
     parent_resource_id: str = None,
     page: int = 1,
     page_size: int = 20,
+    student_id: str = None,
 ) -> dict:
     """List shared teacher resources (folders + files), read-only.
 
@@ -307,20 +321,24 @@ def list_resources(
     - Children of a folder: ?parent_resource_id={rid} (verified working;
       ?parent= also works but returns unfiltered results — avoid it).
     - All resources: omit course_id (paginated, count ~87).
+    - Parents pass the child's student_profile_id as `student_id`.
     """
     params = {"page": page, "page_size": page_size}
     if course_id:
         params["course_id"] = course_id
     if parent_resource_id:
         params["parent_resource_id"] = parent_resource_id
+    if student_id:
+        params["student_id"] = student_id
     url = f"{API_BASE}/api/v1/tenants/{tenant_id}/resources/"
     return HTTP.get(url, headers=get_auth_headers(token), params=params, timeout=15).json()
 
 
-def get_resource(token: str, tenant_id: str, resource_id: str) -> dict:
+def get_resource(token: str, tenant_id: str, resource_id: str, student_id: str = None) -> dict:
     """Get one resource's metadata (folder flag, child_count, file_urls)."""
+    params = {"student_id": student_id} if student_id else None
     url = f"{API_BASE}/api/v1/tenants/{tenant_id}/resources/{resource_id}/"
-    return HTTP.get(url, headers=get_auth_headers(token), timeout=15).json()
+    return HTTP.get(url, headers=get_auth_headers(token), params=params, timeout=15).json()
 
 
 def summarize_resources(data: dict, limit_rows: int = 30) -> str:
@@ -602,12 +620,14 @@ def session_context(margin: int = 300) -> tuple:
 
 
 def assessments_all(token: str, assessment_type: str = None, course_id: str = None,
-                    page_size: int = 100, max_pages: int = 25) -> list:
+                    page_size: int = 100, max_pages: int = 25,
+                    student_id: str = None) -> list:
     """Every student assessment row (FA/SA), following pagination.
 
     Rows are `{assignment_id, status, marks, total_marks, submitted_at,
     student_submission_files, assessment: {id, title, due_date, questions,
     file_urls, submission_open, ...}}`. Detail calls take `assessment.id`.
+    Parents pass the child's student_profile_id as `student_id`.
     """
     items = []
     for page in range(1, max_pages + 1):
@@ -616,6 +636,8 @@ def assessments_all(token: str, assessment_type: str = None, course_id: str = No
             params["assessment_type"] = assessment_type
         if course_id:
             params["course_id"] = course_id
+        if student_id:
+            params["student_id"] = student_id
         data = api(token, "GET", "/api/v1/student/assessments/", params=params)
         batch = _rows(data)
         items += batch
@@ -624,14 +646,22 @@ def assessments_all(token: str, assessment_type: str = None, course_id: str = No
     return items
 
 
-def assessment_submission(token: str, assessment_id: str) -> dict:
-    """What the student handed in: `{submission_urls, comment, submitted_at, status, answers}`."""
-    return api(token, "GET", f"/api/v1/student/assessments/{assessment_id}/submission/")
+def assessment_submission(token: str, assessment_id: str, student_id: str = None) -> dict:
+    """What the student handed in: `{submission_urls, comment, submitted_at, status, answers}`.
+
+    Parents pass the child's student_profile_id as `student_id`.
+    """
+    params = {"student_id": student_id} if student_id else None
+    return api(token, "GET", f"/api/v1/student/assessments/{assessment_id}/submission/", params=params)
 
 
-def assessment_feedback(token: str, assessment_id: str) -> dict:
-    """Teacher feedback: `{total_score, feedback_text, rubric_scores, annotated_files, final_remarks, has_feedback}`."""
-    return api(token, "GET", f"/api/v1/student/assessments/{assessment_id}/feedback/")
+def assessment_feedback(token: str, assessment_id: str, student_id: str = None) -> dict:
+    """Teacher feedback: `{total_score, feedback_text, rubric_scores, annotated_files, final_remarks, has_feedback}`.
+
+    Parents pass the child's student_profile_id as `student_id`.
+    """
+    params = {"student_id": student_id} if student_id else None
+    return api(token, "GET", f"/api/v1/student/assessments/{assessment_id}/feedback/", params=params)
 
 
 def request_summary(token: str, assessment_ids: list) -> dict:
@@ -668,28 +698,49 @@ def eol_feedback(token: str, tenant_id: str, test_id: str) -> list:
     return data.get("feedbacks", []) if isinstance(data, dict) else _rows(data)
 
 
-def learning_tasks(token: str, tenant_id: str, course_id: str = None) -> list:
+def learning_tasks(token: str, tenant_id: str, course_id: str = None,
+                   student_id: str = None) -> list:
     """Learning tasks (`/studentassignment` in the web app): `{id, title, instructions,
-    due_date, status, score, grade, feedback_text, attachments[{name, file_url, ...}]}`."""
-    params = {"course_id": course_id} if course_id else None
-    return _rows(api(token, "GET", f"/api/v1/tenants/{tenant_id}/assignments/student/list/", params=params))
+    due_date, status, score, grade, feedback_text, attachments[{name, file_url, ...}]}`.
+
+    Parents pass the child's student_profile_id as `student_id`. The upstream list
+    can repeat a task once per recipient; callers should dedupe by `id`.
+    """
+    params = {k: v for k, v in (("course_id", course_id), ("student_id", student_id)) if v}
+    return _rows(api(token, "GET", f"/api/v1/tenants/{tenant_id}/assignments/student/list/",
+                     params=params or None))
 
 
-def learning_task_detail(token: str, tenant_id: str, task_id: str) -> dict:
-    """`{assignment, recipient_status, submission, score, grade, feedback_text}` for one task."""
-    return api(token, "GET", f"/api/v1/tenants/{tenant_id}/assignments/student/{task_id}/detail/")
+def learning_task_detail(token: str, tenant_id: str, task_id: str,
+                         student_id: str = None) -> dict:
+    """`{assignment, recipient_status, submission, score, grade, feedback_text}` for one task.
+
+    Parents pass the child's student_profile_id as `student_id`. The upstream
+    detail returns 400 for tasks with multiple recipients; handle that.
+    """
+    params = {"student_id": student_id} if student_id else None
+    return api(token, "GET", f"/api/v1/tenants/{tenant_id}/assignments/student/{task_id}/detail/",
+               params=params)
 
 
-def announcements_visible(token: str, academic_year: str = None) -> list:
+def announcements_visible(token: str, academic_year: str = None,
+                          student_id: str = None) -> list:
     """Announcements visible to the student, with the full HTML `message`, `creator`
-    and `file_urls` (the plain /api/announcements/ list is the older endpoint)."""
-    params = {"academic_year": academic_year} if academic_year else None
-    return _rows(api(token, "GET", "/api/announcements/visible/", params=params))
+    and `file_urls` (the plain /api/announcements/ list is the older endpoint).
+    Parents pass the child's student_profile_id as `student_id`.
+    """
+    params = {k: v for k, v in (("academic_year", academic_year),
+                                ("student_id", student_id)) if v}
+    return _rows(api(token, "GET", "/api/announcements/visible/", params=params or None))
 
 
-def message_contacts(token: str, tenant_id: str) -> list:
-    """People the student may message: `{user_id, full_name, role, email, subjects, subject_label}`."""
-    return _rows(api(token, "GET", f"/api/v1/tenants/{tenant_id}/messages/contacts/"))
+def message_contacts(token: str, tenant_id: str, student_id: str = None) -> list:
+    """People the student may message: `{user_id, full_name, role, email, subjects, subject_label}`.
+
+    Parents pass the child's student_profile_id to get that child's teachers.
+    """
+    params = {"student_id": student_id} if student_id else None
+    return _rows(api(token, "GET", f"/api/v1/tenants/{tenant_id}/messages/contacts/", params=params))
 
 
 def message_threads(token: str, tenant_id: str) -> list:
@@ -739,6 +790,132 @@ def policies(token: str, tenant_id: str, program_year_id: str = None) -> list:
 def help_articles(token: str, tenant_id: str, audience: str = "student") -> list:
     """Help articles published for students (often empty)."""
     return _rows(api(token, "GET", f"/api/v1/tenants/{tenant_id}/help/", params={"audience": audience}))
+
+
+# --- Parents -----------------------------------------------------------------
+#
+# A parent token sees each child's data through dedicated parent routes plus
+# the student routes with ?student_id={student_profile_id}. The profile id is
+# the `student_profile_id` in parent_children(); report-engine student-pdfs is
+# the exception and takes the child's *user* id (`user_id`).
+#
+# Parents can read and mark things read, but cannot start/submit tests or
+# request extensions: the per-student EOL result endpoint is 403 for them.
+
+
+def parent_children(token: str) -> list:
+    """Children linked to the signed-in parent.
+
+    Each row: `{student_profile_id, user_id, full_name, email, status,
+    current_program_year_id, program_name, program_code, program_type,
+    academic_year, current_class_grade, current_class_section,
+    current_class_label}`.
+    """
+    return _rows(api(token, "GET", "/api/v1/parents/me/children"))
+
+
+def parent_child_courses(token: str, tenant_id: str, student_profile_id: str,
+                         year: str = None, include_teachers: bool = True,
+                         include_classes: bool = True) -> dict:
+    """One child's courses for a programme year.
+
+    Returns `{student_profile_id, program_year_id, program_id, program_name,
+    program_code, academic_year, year_filter_fallback, courses: [...]}`.
+    Note: `include_teachers` is accepted but the API can return an empty
+    `teachers` list for parent tokens.
+    """
+    params = {
+        "include_teachers": str(bool(include_teachers)).lower(),
+        "include_classes": str(bool(include_classes)).lower(),
+    }
+    if year:
+        params["year"] = year
+    return api(token, "GET",
+               f"/api/v1/tenants/{tenant_id}/parents/me/children/{student_profile_id}/courses/",
+               params=params)
+
+
+def parent_attendance(token: str, from_date: str = None, to_date: str = None) -> list:
+    """Attendance summary for every child, one entry per child.
+
+    Entry: `{student_id, student_name, attendance_start_date, total_sessions,
+    present, absent, late, excused, ..., percentage, attendance: [{date,
+    subject, class, period_no, status, remarks, is_calendar_event, ...}]}`.
+    `student_id` is the child's student_profile_id.
+    """
+    params = {k: v for k, v in (("from_date", from_date), ("to_date", to_date)) if v}
+    data = api(token, "GET", "/api/v1/parents/me/attendance/", params=params or None)
+    return data if isinstance(data, list) else _rows(data)
+
+
+def parent_child_calendar(token: str, tenant_id: str, student_profile_id: str,
+                          from_date: str = None, to_date: str = None) -> dict:
+    """One child's calendar `{student_id, student_name, from, to, count, events}`.
+
+    Events: `{id, kind, title, subject, at, course_id, source_type, source_id,
+    meta}`; `kind` is one of eol_open, eol_close, eol_submitted, fa_submitted.
+    The API filters with `from`/`to` (not from_date/to_date); omitting both
+    returns the whole year.
+    """
+    params = {k: v for k, v in (("from", from_date), ("to", to_date)) if v}
+    return api(token, "GET",
+               f"/api/v1/tenants/{tenant_id}/parents/me/children/{student_profile_id}/calendar/",
+               params=params or None)
+
+
+def parent_child_learner_profile(token: str, student_profile_id: str,
+                                 year: str = None) -> dict:
+    """One child's learner profile: `{program_year_id, academic_year, subjects}`.
+
+    Each subject: `{folder_id, subject, academic_year, items: [{file_id, title,
+    category, source_type, source_id, file_url, issued_at, submitted_at,
+    marks_obtained, total_marks, status, feedback_text, recipient_status}]}`.
+    """
+    params = {"year": year} if year else None
+    return api(token, "GET", f"/api/v1/parents/children/{student_profile_id}/learner-profile",
+               params=params)
+
+
+def parent_overview(token: str, tenant_id: str, student_profile_id: str = None,
+                    year: str = None) -> dict:
+    """Unified read-only view for one child (or every child when no id is given).
+
+    Merges the parent routes with the child-scoped student reads:
+    children → courses → EOL + FA/SA + learning tasks + resources.
+    Does not fetch EOL results (403 for parents) and does not write.
+    """
+    children = parent_children(token)
+    if student_profile_id:
+        children = [c for c in children if c.get("student_profile_id") == student_profile_id]
+    out = []
+    for child in children:
+        sid = child.get("student_profile_id")
+        if not sid:
+            continue
+        child_year = year or child.get("academic_year")
+        courses = safe_call(lambda: parent_child_courses(token, tenant_id, sid, year=child_year), {})
+        out.append({
+            "child": child,
+            "year": child_year,
+            "courses": courses,
+            "eol": safe_call(lambda: eol_tests(token, tenant_id, student_id=sid, year=child_year), {}),
+            "assessments": {
+                "FA": safe_call(lambda: assessments_all(token, "FA", student_id=sid), []),
+                "SA": safe_call(lambda: assessments_all(token, "SA", student_id=sid), []),
+            },
+            "tasks": safe_call(lambda: learning_tasks(token, tenant_id, student_id=sid), []),
+            "resources": safe_call(lambda: list_resources(token, tenant_id, student_id=sid,
+                                                          page_size=20), {}),
+        })
+    return {"children": out}
+
+
+def safe_call(fn, fallback):
+    """Run a read, returning `fallback` if the LMS errors (partial overviews stay useful)."""
+    try:
+        return fn()
+    except Exception:
+        return fallback
 
 
 # --- Writes ------------------------------------------------------------------
@@ -979,7 +1156,7 @@ def _parse_flags(raw_args):
     """Split CLI args into positionals and --flag values. Supports:
     --json, --unread-only, --inline, --yes, --all, --course X, --parent X,
     --page N, --page-size N, --limit N, --offset N, --out DIR, --type T,
-    --year Y, --comment C, --text T, --due ISO."""
+    --year Y, --student ID, --from DATE, --to DATE, --comment C, --text T, --due ISO."""
     pos, flags = [], {}
     i = 0
     while i < len(raw_args):
@@ -995,7 +1172,8 @@ def _parse_flags(raw_args):
         elif a == "--all":
             flags["all"] = True
         elif a in ("--course", "--parent", "--page", "--page-size", "--limit", "--offset", "--out",
-                   "--type", "--year", "--comment", "--text", "--due") and i + 1 < len(raw_args):
+                   "--type", "--year", "--student", "--from", "--to", "--comment", "--text",
+                   "--due") and i + 1 < len(raw_args):
             flags[a[2:].replace("-", "_")] = raw_args[i + 1]
             i += 1
         else:
@@ -1169,6 +1347,14 @@ Core:
                                            View notifications (no mark-read)
   announcements [tenant] [year]            School announcements
   calendar                                 Calendar events
+  parent-children                          Children linked to a parent account
+  parent-courses <student_profile_id> [year]
+                                           One child's courses and classes
+  parent-attendance [--student ID] [--from DATE] [--to DATE]
+  parent-calendar <student_profile_id> [--from DATE] [--to DATE]
+  parent-profile <student_profile_id> [year]
+  parent-overview [student_profile_id] [year]
+                                           Parent dashboard data, one child or all
 
 Assignments (teacher-published work):
   assessments [--json]                     FA/SDL assessments with due dates
@@ -1276,6 +1462,63 @@ Environment (.env supported via python-dotenv):
         tid = args[1] if len(args) > 1 else (tenant_id or os.environ.get("INDUSLMS_TENANT") or input("Tenant ID: "))
         year = args[2] if len(args) > 2 else None
         pp(my_courses(token, tid, year))
+
+    elif cmd == "parent-children":
+        if not token:
+            print("No token. Run login first.")
+            return
+        pp(parent_children(token))
+
+    elif cmd == "parent-courses":
+        if not token:
+            print("No token. Run login first.")
+            return
+        pos, _ = _parse_flags(args[1:])
+        if not pos:
+            print("Usage: parent-courses <student_profile_id> [year]")
+            return
+        tid = tenant_id or os.environ.get("INDUSLMS_TENANT") or input("Tenant ID: ")
+        pp(parent_child_courses(token, tid, pos[0], pos[1] if len(pos) > 1 else None))
+
+    elif cmd == "parent-attendance":
+        if not token:
+            print("No token. Run login first.")
+            return
+        _, flags = _parse_flags(args[1:])
+        pp(parent_attendance(token, flags.get("from"), flags.get("to")))
+        if flags.get("student"):
+            tid = tenant_id or os.environ.get("INDUSLMS_TENANT") or input("Tenant ID: ")
+            pp(attendance_day(token, tid, student_id=flags["student"],
+                              from_date=flags.get("from"), to_date=flags.get("to")))
+
+    elif cmd == "parent-calendar":
+        if not token:
+            print("No token. Run login first.")
+            return
+        pos, flags = _parse_flags(args[1:])
+        if not pos:
+            print("Usage: parent-calendar <student_profile_id> [--from DATE] [--to DATE]")
+            return
+        tid = tenant_id or os.environ.get("INDUSLMS_TENANT") or input("Tenant ID: ")
+        pp(parent_child_calendar(token, tid, pos[0], flags.get("from"), flags.get("to")))
+
+    elif cmd == "parent-profile":
+        if not token:
+            print("No token. Run login first.")
+            return
+        pos, _ = _parse_flags(args[1:])
+        if not pos:
+            print("Usage: parent-profile <student_profile_id> [year]")
+            return
+        pp(parent_child_learner_profile(token, pos[0], pos[1] if len(pos) > 1 else None))
+
+    elif cmd == "parent-overview":
+        if not token:
+            print("No token. Run login first.")
+            return
+        pos, _ = _parse_flags(args[1:])
+        tid = tenant_id or os.environ.get("INDUSLMS_TENANT") or input("Tenant ID: ")
+        pp(parent_overview(token, tid, pos[0] if pos else None, pos[1] if len(pos) > 1 else None))
 
     elif cmd == "attendance":
         if not token:

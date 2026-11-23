@@ -52,6 +52,38 @@ Base: `https://api.induslms.com`, header `Authorization: Bearer <access>`,
 | Policies | `GET /api/v1/tenants/{tid}/academic-years/{program_year_id}/policies/` (the web app reads every year and dedupes by title) |
 | Help | `GET /api/v1/tenants/{tid}/help/?audience=student` |
 
+## Parents (verified live, Nov 23 2026)
+
+A parent token reads a child through the parent routes and the student routes
+with `?student_id={student_profile_id}`. `student_profile_id` is the
+`parents/me/children` id; report-engine `student-pdfs` is the exception and
+takes the child's `user_id`.
+
+| Purpose | Method + path |
+|---|---|
+| Children | `GET /api/v1/parents/me/children` → `{count, results: [{student_profile_id, user_id, full_name, email, status, current_program_year_id, program_name, program_code, program_type, academic_year, current_class_grade, current_class_section, current_class_label}]}` |
+| Child courses | `GET /api/v1/tenants/{tid}/parents/me/children/{spid}/courses/?year=&include_teachers=true&include_classes=true` |
+| Child calendar | `GET /api/v1/tenants/{tid}/parents/me/children/{spid}/calendar/?from=&to=` (`from`/`to`; `count` + `events[{kind, title, subject, at, course_id, source_id, meta}]`) |
+| Attendance summary (all children) | `GET /api/v1/parents/me/attendance/?from_date=&to_date=` → `[{student_id (profile), student_name, attendance_start_date, totals..., percentage, attendance[...]}]` |
+| Child learner profile | `GET /api/v1/parents/children/{spid}/learner-profile?year=` |
+| Help | `GET /api/v1/tenants/{tid}/help/?audience=parent` |
+| Festival banners | `GET /api/v1/festival-banners/active/?role=parent[&grade=][&program_year_id=]` |
+
+Child-scoped reads (each accepts `student_id={spid}`): assessments
+(`/api/v1/student/assessments/`), assessment submission/feedback
+(`/api/v1/student/assessments/{aid}/submission|feedback/`), EOL list
+(`/eol-tests/my/`), learning tasks list/detail, resources list/detail,
+notifications, announcements visible, message contacts, attendance day
+(`/students/me/attendance/day/?from_date=&to_date=&student_id=`).
+
+Parent denials (do not retry with impersonation):
+`GET .../eol-tests/{test_id}/students/{user_id}/` → 403 (no answer review);
+`GET /api/v1/assessments/context/` → 403;
+`GET /api/v1/tenants/{tid}/policies/` and `.../students/me/attendance/` → 404;
+`.../me/student/courses?student_id=` → 404 (use the parent child-courses route).
+Parents can mark notifications/announcements read and send messages
+(`POST .../messages/ {to_user_id, text}`), but cannot submit work.
+
 ## Writes (bundle + live traces; `lms.py` functions in brackets)
 
 | Action | Call |

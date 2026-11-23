@@ -30,6 +30,25 @@ Reads freely. **WRITE** tools (send, mark-read, extension requests, hand-ins) ch
 7. **Messages**: `list_message_threads`, `get_conversation(user_id)`, `list_message_contacts`. Sending is a WRITE.
 8. **Writes** (on request, confirmed): `send_message`, `mark_notification_read` / `mark_all_notifications_read`, `mark_announcement_read`, `request_extension_or_resubmission` (reason 10–500 chars), `cancel_request`, `submit_assessment_files` / `submit_learning_task` (local files, the student's own work).
 
+## Parent accounts
+
+If the saved token belongs to a parent, read the child through the parent tools
+and pass `student_profile_id` to the child-scoped reads:
+
+1. `list_children` → `student_profile_id` (profile) and `user_id` (account).
+2. `child_courses(spid)`, `child_attendance(spid, from_date, to_date)`,
+   `child_calendar(spid)`, `child_learner_profile(spid)`, `child_overview(spid)`.
+3. For a single child: `list_assessments(..., student_profile_id=spid)`,
+   `list_eol(..., student_profile_id=spid)`,
+   `list_learning_tasks(..., student_profile_id=spid)`,
+   `list_resources(..., student_profile_id=spid)`,
+   `get_assessment_submission/feedback(..., student_profile_id=spid)`,
+   `list_notifications(..., student_profile_id=spid)`,
+   `get_attendance_day(student_profile_id=spid)`.
+4. Parents see the child's scores, submissions and feedback but **cannot** see
+   EOL answers (the per-student result endpoint is 403) and cannot submit work
+   or request extensions. Never use another account to bypass this.
+
 ## Email workflow
 
 * Prefer Apple Mail.app tools — zero setup: `schoolmail_search [query] [--sender] [--since ISO]`, `schoolmail_read <Mailbox:id>`, `schoolmail_folders`. Account `School`, newest first.

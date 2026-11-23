@@ -2,7 +2,24 @@
 
 All notable changes, newest first. Versioning is manual (`pyproject.toml` + git tag).
 
-## 0.4.0 — unreleased
+## 0.5.0 — 2026-11-23
+
+- **Parents**: `parent_children`, `parent_child_courses`, `parent_attendance`,
+  `parent_child_calendar`, `parent_child_learner_profile`, `parent_overview`.
+  The profile id from `parent_children()` is the `student_id` for the
+  child-scoped reads; `student_id` is now accepted by assessments, submission,
+  feedback, EOL, tasks, resources, notifications, announcements, contacts and
+  attendance-day. Parents get list/score access but no EOL answers (the
+  per-student result endpoint is 403) and never submit work.
+- **MCP**: 48 tools (+6 parent tools: `list_children`, `child_courses`,
+  `child_attendance`, `child_calendar`, `child_learner_profile`,
+  `child_overview`); `student_profile_id` on the child-scoped read tools.
+- **CLI**: `parent-children`, `parent-courses`, `parent-attendance`,
+  `parent-calendar`, `parent-profile`, `parent-overview`.
+- **Docs/tests**: parent section in `references/endpoints.md`, skill workflow,
+  and offline parent path/registry tests in `tests/test_parents.py`.
+
+## 0.4.0 — 2026-10-10
 
 - **Writes** (read-only rule lifted): `eol_open` / `eol_submit` / `eol_proctor_event` / `eol_explain`, `assessment_submit_questions` / `assessment_submit_upload` / `assessment_resubmit`, `assessment_request` / `request_cancel`, `upload_file(s)` (S3 presigned PUT; modules `assignment_submission` and the LMS's own `assesement` spelling), `task_submit`, `send_message`, `notification_read` / `notifications_read_all`, `announcement_read`. All go through `api()`, raise `LMSError(status, code, message)` and never retry.
 - **More reads**: `assessments_all` (all pages), `assessment_submission` / `assessment_feedback` (by `assessment.id`), `request_summary` (50 ids per call), `eol_result`, `eol_feedback`, `learning_tasks`, `learning_task_detail`, `announcements_visible` (full HTML + `file_urls`), `message_contacts` / `message_threads` / `message_conversation` (oldest first), `program_years`, `policies` (all programme years, deduped), `help_articles`; `eol_tests(course_id=, year=)`.
